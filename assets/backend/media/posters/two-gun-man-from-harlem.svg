@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+  <rect width="600" height="900" fill="#1e130c"/>
+  <rect x="36" y="36" width="528" height="828" rx="24" fill="#4d2c18" stroke="#efca7a" stroke-width="4"/>
+  <text x="60" y="120" fill="#efca7a" font-size="28" font-family="Georgia, serif">HollowCast Classic Cinema</text>
+  <text x="60" y="314" fill="#fff0d9" font-size="46" font-weight="700" font-family="Georgia, serif">TWO-GUN MAN</text>
+  <text x="60" y="374" fill="#fff0d9" font-size="46" font-weight="700" font-family="Georgia, serif">FROM HARLEM</text>
+  <text x="60" y="466" fill="#efca7a" font-size="34" font-family="Georgia, serif">Black Cinema  •  Western</text>
+  <text x="60" y="790" fill="#dfc9a5" font-size="26" font-family="Georgia, serif">1938  •  Herbert Jeffries</text>
+</svg>

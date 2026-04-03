@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+  <rect width="600" height="900" fill="#0f1218"/>
+  <rect x="34" y="34" width="532" height="832" rx="26" fill="#1d2230" stroke="#e0b970" stroke-width="4"/>
+  <text x="62" y="116" fill="#e0b970" font-size="28" font-family="Georgia, serif">HollowCast Classic Cinema</text>
+  <text x="62" y="330" fill="#f4ead7" font-size="62" font-weight="700" font-family="Georgia, serif">MURDER</text>
+  <text x="62" y="402" fill="#f4ead7" font-size="62" font-weight="700" font-family="Georgia, serif">IN HARLEM</text>
+  <text x="62" y="488" fill="#ddb26a" font-size="34" font-family="Georgia, serif">Black Cinema  •  Mystery</text>
+  <text x="62" y="792" fill="#c6b59b" font-size="26" font-family="Georgia, serif">1935  •  Oscar Micheaux</text>
+</svg>

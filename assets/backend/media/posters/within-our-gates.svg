@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0c0f14"/>
+      <stop offset="100%" stop-color="#3c1c17"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <rect x="36" y="36" width="528" height="828" rx="24" fill="none" stroke="#d6b36a" stroke-width="4"/>
+  <text x="60" y="120" fill="#d6b36a" font-size="30" font-family="Georgia, serif">HollowCast Classic Cinema</text>
+  <text x="60" y="360" fill="#f4ead7" font-size="72" font-weight="700" font-family="Georgia, serif">WITHIN</text>
+  <text x="60" y="440" fill="#f4ead7" font-size="72" font-weight="700" font-family="Georgia, serif">OUR GATES</text>
+  <text x="60" y="520" fill="#d6b36a" font-size="34" font-family="Georgia, serif">Black Cinema  •  Drama</text>
+  <text x="60" y="790" fill="#bfa98b" font-size="26" font-family="Georgia, serif">1920  •  Oscar Micheaux</text>
+</svg>

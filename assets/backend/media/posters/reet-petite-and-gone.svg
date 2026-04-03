@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+  <rect width="600" height="900" fill="#1c1020"/>
+  <rect x="38" y="38" width="524" height="824" rx="24" fill="#3f1f4d" stroke="#efc76e" stroke-width="4"/>
+  <text x="62" y="122" fill="#efc76e" font-size="28" font-family="Georgia, serif">HollowCast Classic Cinema</text>
+  <text x="62" y="318" fill="#fbeed7" font-size="50" font-weight="700" font-family="Georgia, serif">REET, PETITE</text>
+  <text x="62" y="382" fill="#fbeed7" font-size="50" font-weight="700" font-family="Georgia, serif">AND GONE</text>
+  <text x="62" y="472" fill="#efc76e" font-size="34" font-family="Georgia, serif">Black Cinema  •  Comedy</text>
+  <text x="62" y="792" fill="#d8c3a1" font-size="26" font-family="Georgia, serif">1947  •  Louis Jordan</text>
+</svg>

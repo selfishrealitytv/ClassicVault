@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a0d"/>
+      <stop offset="55%" stop-color="#171314"/>
+      <stop offset="100%" stop-color="#040404"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.38"/>
+      <stop offset="55%" stop-color="#d4af37" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#d4af37" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect width="1200" height="675" fill="url(#glow)"/>
+  <circle cx="930" cy="160" r="118" fill="none" stroke="#d4af37" stroke-opacity="0.34" stroke-width="2"/>
+  <circle cx="930" cy="160" r="186" fill="none" stroke="#d4af37" stroke-opacity="0.12" stroke-width="1.5"/>
+  <line x1="178" y1="116" x2="178" y2="545" stroke="#d4af37" stroke-opacity="0.7" stroke-width="4"/>
+  <text x="220" y="240" fill="#f2d37a" font-size="88" font-weight="700" font-family="Arial, Helvetica, sans-serif" letter-spacing="4">THE</text>
+  <text x="220" y="338" fill="#ffffff" font-size="96" font-weight="800" font-family="Arial, Helvetica, sans-serif" letter-spacing="3">TWILIGHT</text>
+  <text x="220" y="436" fill="#ffffff" font-size="96" font-weight="800" font-family="Arial, Helvetica, sans-serif" letter-spacing="3">ZONE</text>
+  <text x="222" y="520" fill="#d6d0bf" font-size="28" font-family="Arial, Helvetica, sans-serif" letter-spacing="6">CLASSIC TV SERIES</text>
+  <text x="222" y="565" fill="#9d9687" font-size="22" font-family="Arial, Helvetica, sans-serif">Another dimension. Another anthology. One readable poster.</text>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+  <rect width="600" height="900" fill="#140b0c"/>
+  <rect x="48" y="48" width="504" height="804" rx="24" fill="#2e0f13" stroke="#c9a15b" stroke-width="4"/>
+  <text x="70" y="120" fill="#c9a15b" font-size="28" font-family="Georgia, serif">HollowCast Classic Cinema</text>
+  <text x="70" y="340" fill="#f6ecdc" font-size="60" font-weight="700" font-family="Georgia, serif">THE BLOOD</text>
+  <text x="70" y="412" fill="#f6ecdc" font-size="60" font-weight="700" font-family="Georgia, serif">OF JESUS</text>
+  <text x="70" y="500" fill="#d9b16c" font-size="34" font-family="Georgia, serif">Black Cinema  •  Drama</text>
+  <circle cx="470" cy="230" r="54" fill="#c9a15b" opacity=".18"/>
+  <text x="70" y="790" fill="#ccb89a" font-size="26" font-family="Georgia, serif">1941  •  Spencer Williams</text>
+</svg>
