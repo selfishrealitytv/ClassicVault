@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 22%, rgba(86, 135, 190, 0.14), transparent 36%),
+          radial-gradient(circle at 50% 70%, rgba(255, 168, 76, 0.07), transparent 28%),
+          #02070d;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: manipulation;
+      }
+    </style>
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js"></script>
+  </head>
+  <body>
+    <script>
+      (() => {
+        const bridge = (payload) => {
+          if (window.HollowCastBridge) {
+            window.HollowCastBridge.postMessage(JSON.stringify(payload));
+          }
+        };
+
+        const renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          alpha: true,
+          powerPreference: "high-performance",
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x02070d, 0.12);
+
+        const camera = new THREE.PerspectiveCamera(
+          48,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(0, 0, 0.85);
+
+        const room = new THREE.Mesh(
+          new THREE.SphereGeometry(14, 40, 40),
+          new THREE.MeshBasicMaterial({
+            color: 0x02070d,
+            side: THREE.BackSide,
+          })
+        );
+        scene.add(room);
+
+        const ambient = new THREE.AmbientLight(0x7eaed6, 0.4);
+        scene.add(ambient);
+
+        const keyLight = new THREE.PointLight(0x98cfff, 1.2, 18, 2);
+        keyLight.position.set(0, 0.7, 1.2);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.PointLight(0xffb377, 0.45, 16, 2);
+        fillLight.position.set(0.9, -0.2, 0.6);
+        scene.add(fillLight);
+
+        const anchorRig = new THREE.Group();
+        scene.add(anchorRig);
+
+        const portalGroup = new THREE.Group();
+        portalGroup.position.set(0, 0.04, -3.3);
+        anchorRig.add(portalGroup);
+
+        const presenceGroup = new THREE.Group();
+        presenceGroup.position.set(0, -0.06, 1.75);
+        anchorRig.add(presenceGroup);
+
+        const portalGeometry = new THREE.PlaneGeometry(2.86, 1.66, 72, 40);
+        const portalPositions = portalGeometry.attributes.position;
+        for (let index = 0; index < portalPositions.count; index += 1) {
+          const x = portalPositions.getX(index);
+          const y = portalPositions.getY(index);
+          const curve = Math.sin((x / 2.86) * Math.PI) * 0.15;
+          const lift = Math.cos((y / 1.66) * Math.PI) * 0.02;
+          portalPositions.setZ(index, curve + lift);
+        }
+        portalGeometry.computeVertexNormals();
+
+        const auraGeometry = new THREE.PlaneGeometry(4.4, 2.8, 1, 1);
+        const spillGeometry = new THREE.PlaneGeometry(3.6, 2.5, 1, 1);
+        const shadowGeometry = new THREE.PlaneGeometry(3.4, 1.15, 1, 1);
+
+        const video = document.createElement("video");
+        video.crossOrigin = "anonymous";
+        video.playsInline = true;
+        video.loop = true;
+        video.autoplay = true;
+        video.preload = "auto";
+
+        const videoTexture = new THREE.VideoTexture(video);
+        videoTexture.colorSpace = THREE.SRGBColorSpace;
+        videoTexture.minFilter = THREE.LinearFilter;
+        videoTexture.magFilter = THREE.LinearFilter;
+
+        const sampleCanvas = document.createElement("canvas");
+        sampleCanvas.width = 48;
+        sampleCanvas.height = 27;
+        const sampleContext = sampleCanvas.getContext("2d", {
+          willReadFrequently: true,
+        });
+
+        const sharedUniforms = {
+          map: { value: videoTexture },
+          brightness: { value: 0.42 },
+          immersion: { value: 0.82 },
+          reveal: { value: 0.0 },
+          time: { value: 0.0 },
+          motionX: { value: 0.0 },
+          motionY: { value: 0.0 },
+          motionEnergy: { value: 0.0 },
+        };
+
+        function createPortalMaterial(options) {
+          return new THREE.ShaderMaterial({
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            uniforms: {
+              map: sharedUniforms.map,
+              brightness: sharedUniforms.brightness,
+              immersion: sharedUniforms.immersion,
+              reveal: sharedUniforms.reveal,
+              time: sharedUniforms.time,
+              motionX: sharedUniforms.motionX,
+              motionY: sharedUniforms.motionY,
+              motionEnergy: sharedUniforms.motionEnergy,
+              bandStart: { value: options.bandStart },
+              bandEnd: { value: options.bandEnd },
+              layerAlpha: { value: options.layerAlpha },
+              edgeSoftness: { value: options.edgeSoftness },
+              distortion: { value: options.distortion },
+              noiseAmount: { value: options.noiseAmount },
+              tint: { value: new THREE.Color(options.tint) },
+            },
+            vertexShader: `
+              varying vec2 vUv;
+              varying vec3 vNormal;
+              void main() {
+                vUv = uv;
+                vNormal = normal;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform sampler2D map;
+              uniform float brightness;
+              uniform float immersion;
+              uniform float reveal;
+              uniform float time;
+              uniform float motionX;
+              uniform float motionY;
+              uniform float motionEnergy;
+              uniform float bandStart;
+              uniform float bandEnd;
+              uniform float layerAlpha;
+              uniform float edgeSoftness;
+              uniform float distortion;
+              uniform float noiseAmount;
+              uniform vec3 tint;
+              varying vec2 vUv;
+              varying vec3 vNormal;
+
+              float rand(vec2 co) {
+                return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+              }
+
+              vec4 blurredSample(vec2 uv) {
+                vec2 offset = vec2(0.004, 0.0026);
+                vec4 color = texture2D(map, uv) * 0.34;
+                color += texture2D(map, uv + vec2(offset.x, 0.0)) * 0.18;
+                color += texture2D(map, uv - vec2(offset.x, 0.0)) * 0.18;
+                color += texture2D(map, uv + vec2(0.0, offset.y)) * 0.15;
+                color += texture2D(map, uv - vec2(0.0, offset.y)) * 0.15;
+                return color;
+              }
+
+              void main() {
+                vec2 centered = vUv - 0.5;
+                float radial = length(vec2(centered.x * 1.08, centered.y * 1.28));
+                float border = smoothstep(0.2, 0.5, radial);
+                float distortionWave =
+                  sin((vUv.y * 18.0) + time * 0.7 + motionEnergy * 10.0) * 0.0032 +
+                  cos((vUv.x * 11.0) - time * 0.4) * 0.0024;
+                vec2 distortionVector = normalize(centered + 0.0001) * border * distortionWave * distortion;
+                vec2 distortedUv = clamp(
+                  vUv + distortionVector + vec2(motionX * 0.006, motionY * 0.004) * border,
+                  0.0,
+                  1.0
+                );
+                vec4 source = blurredSample(distortedUv);
+                float luma = dot(source.rgb, vec3(0.299, 0.587, 0.114));
+                float layerMask = smoothstep(bandStart, bandStart + 0.14, luma)
+                  * (1.0 - smoothstep(bandEnd - 0.14, bandEnd, luma));
+                float feather = exp(-pow(max(radial - edgeSoftness, 0.0) * 5.4, 2.0));
+                float adaptiveVignette = 1.0 - smoothstep(0.28 + brightness * 0.18, 0.74, radial);
+                float alphaGradient = clamp(feather * adaptiveVignette, 0.0, 1.0);
+                float revealMask = smoothstep(1.04, 0.06, radial + (1.0 - reveal) * 0.92);
+                float normalGlow = pow(max(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0)), 0.0), 2.2);
+                float grain = (rand(vUv * (time * 0.1 + 20.0)) - 0.5) * noiseAmount;
+                vec3 graded = source.rgb * (0.95 + immersion * 0.08);
+                graded = mix(graded, graded + tint * 0.06, normalGlow * 0.3);
+                graded += grain;
+                float alpha = alphaGradient * revealMask * max(layerMask, 0.18) * layerAlpha;
+                if (alpha < 0.01) {
+                  discard;
+                }
+                gl_FragColor = vec4(graded, alpha);
+              }
+            `,
+          });
+        }
+
+        const backgroundLayer = new THREE.Mesh(
+          portalGeometry,
+          createPortalMaterial({
+            bandStart: 0.0,
+            bandEnd: 0.58,
+            layerAlpha: 0.52,
+            edgeSoftness: 0.37,
+            distortion: 0.55,
+            noiseAmount: 0.018,
+            tint: 0x74a9de,
+          })
+        );
+        backgroundLayer.position.z = -0.06;
+        portalGroup.add(backgroundLayer);
+
+        const midLayer = new THREE.Mesh(
+          portalGeometry,
+          createPortalMaterial({
+            bandStart: 0.2,
+            bandEnd: 0.86,
+            layerAlpha: 0.94,
+            edgeSoftness: 0.34,
+            distortion: 0.72,
+            noiseAmount: 0.022,
+            tint: 0x9bc4e7,
+          })
+        );
+        portalGroup.add(midLayer);
+
+        const foregroundLayer = new THREE.Mesh(
+          portalGeometry,
+          createPortalMaterial({
+            bandStart: 0.46,
+            bandEnd: 1.02,
+            layerAlpha: 0.48,
+            edgeSoftness: 0.31,
+            distortion: 0.9,
+            noiseAmount: 0.026,
+            tint: 0xffc188,
+          })
+        );
+        foregroundLayer.position.z = 0.06;
+        portalGroup.add(foregroundLayer);
+
+        const peripheralMaterial = new THREE.ShaderMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          uniforms: {
+            map: sharedUniforms.map,
+            reveal: sharedUniforms.reveal,
+            time: sharedUniforms.time,
+            motionX: sharedUniforms.motionX,
+            motionY: sharedUniforms.motionY,
+            motionEnergy: sharedUniforms.motionEnergy,
+            brightness: sharedUniforms.brightness,
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D map;
+            uniform float reveal;
+            uniform float time;
+            uniform float motionX;
+            uniform float motionY;
+            uniform float motionEnergy;
+            uniform float brightness;
+            varying vec2 vUv;
+
+            vec4 blur(vec2 uv) {
+              vec2 spread = vec2(0.014 + motionEnergy * 0.03, 0.009 + motionEnergy * 0.02);
+              vec4 color = texture2D(map, uv) * 0.2;
+              color += texture2D(map, uv + vec2(spread.x, 0.0)) * 0.14;
+              color += texture2D(map, uv - vec2(spread.x, 0.0)) * 0.14;
+              color += texture2D(map, uv + vec2(0.0, spread.y)) * 0.12;
+              color += texture2D(map, uv - vec2(0.0, spread.y)) * 0.12;
+              color += texture2D(map, uv + spread * 0.6) * 0.14;
+              color += texture2D(map, uv - spread * 0.6) * 0.14;
+              return color;
+            }
+
+            void main() {
+              vec2 centered = vUv - 0.5;
+              float radial = length(vec2(centered.x * 1.05, centered.y * 1.16));
+              float ring = smoothstep(0.33, 0.9, radial) * (1.0 - smoothstep(0.88, 1.2, radial));
+              vec2 sampleUv = clamp(
+                vec2(0.5) + centered * 0.56 + vec2(motionX * 0.015, motionY * 0.012),
+                0.0,
+                1.0
+              );
+              vec4 source = blur(sampleUv);
+              float alpha = ring * (0.08 + motionEnergy * 0.28 + brightness * 0.08) * reveal;
+              gl_FragColor = vec4(source.rgb, alpha);
+            }
+          `,
+        });
+
+        const auraMesh = new THREE.Mesh(auraGeometry, peripheralMaterial);
+        auraMesh.position.set(0, 0.02, -0.22);
+        portalGroup.add(auraMesh);
+
+        function createSpillMesh(position, scale) {
+          const material = new THREE.MeshBasicMaterial({
+            color: 0x75baf0,
+            transparent: true,
+            opacity: 0.0,
+            blending: THREE.AdditiveBlending,
+          });
+          const mesh = new THREE.Mesh(spillGeometry, material);
+          mesh.position.copy(position);
+          mesh.scale.copy(scale);
+          mesh.renderOrder = -1;
+          portalGroup.add(mesh);
+          return mesh;
+        }
+
+        const leftSpill = createSpillMesh(new THREE.Vector3(-1.3, 0.02, -0.24), new THREE.Vector3(0.5, 1.0, 1));
+        const rightSpill = createSpillMesh(new THREE.Vector3(1.3, 0.02, -0.24), new THREE.Vector3(0.5, 1.0, 1));
+        const topSpill = createSpillMesh(new THREE.Vector3(0, 0.86, -0.24), new THREE.Vector3(1.0, 0.38, 1));
+        const floorSpill = createSpillMesh(new THREE.Vector3(0, -0.88, -0.24), new THREE.Vector3(1.15, 0.44, 1));
+
+        function createExpansionCanvas(width, height) {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d", { willReadFrequently: true });
+          return { canvas, context, texture: new THREE.CanvasTexture(canvas) };
+        }
+
+        const leftExpansion = createExpansionCanvas(128, 256);
+        const rightExpansion = createExpansionCanvas(128, 256);
+        const topExpansion = createExpansionCanvas(256, 96);
+        const floorExpansion = createExpansionCanvas(256, 96);
+
+        function createExpansionMesh(source, width, height, position, rotation = new THREE.Euler()) {
+          const material = new THREE.MeshBasicMaterial({
+            map: source.texture,
+            transparent: true,
+            opacity: 0.62,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          });
+          const mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(width, height),
+            material,
+          );
+          mesh.position.copy(position);
+          mesh.rotation.copy(rotation);
+          portalGroup.add(mesh);
+          return mesh;
+        }
+
+        const leftExpansionMesh = createExpansionMesh(
+          leftExpansion,
+          1.16,
+          1.92,
+          new THREE.Vector3(-1.88, 0.02, -0.2),
+        );
+        const rightExpansionMesh = createExpansionMesh(
+          rightExpansion,
+          1.16,
+          1.92,
+          new THREE.Vector3(1.88, 0.02, -0.2),
+        );
+        const topExpansionMesh = createExpansionMesh(
+          topExpansion,
+          3.2,
+          0.82,
+          new THREE.Vector3(0, 1.18, -0.24),
+        );
+        const floorExpansionMesh = createExpansionMesh(
+          floorExpansion,
+          3.2,
+          0.86,
+          new THREE.Vector3(0, -1.26, -0.28),
+          new THREE.Euler(-0.08, 0, 0),
+        );
+
+        const interactionZoneGroup = new THREE.Group();
+        portalGroup.add(interactionZoneGroup);
+
+        function createInteractionZone(config) {
+          const mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(config.width, config.height),
+            new THREE.MeshBasicMaterial({
+              color: 0xffffff,
+              transparent: true,
+              opacity: 0.0,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            })
+          );
+          mesh.position.set(config.x, config.y, config.z);
+          mesh.userData = {
+            id: config.id,
+            depth: config.depth,
+            response: config.response,
+            side: config.side,
+          };
+          interactionZoneGroup.add(mesh);
+          return mesh;
+        }
+
+        const interactionZones = [
+          createInteractionZone({
+            id: "foreground-living",
+            depth: "foreground",
+            response: "living",
+            side: "center",
+            width: 1.6,
+            height: 0.92,
+            x: 0,
+            y: 0.15,
+            z: 0.14,
+          }),
+          createInteractionZone({
+            id: "mid-hard-left",
+            depth: "mid",
+            response: "hard",
+            side: "left",
+            width: 1.08,
+            height: 1.26,
+            x: -0.72,
+            y: 0.0,
+            z: 0.02,
+          }),
+          createInteractionZone({
+            id: "mid-hard-right",
+            depth: "mid",
+            response: "hard",
+            side: "right",
+            width: 1.08,
+            height: 1.26,
+            x: 0.72,
+            y: 0.0,
+            z: 0.02,
+          }),
+          createInteractionZone({
+            id: "background-soft",
+            depth: "background",
+            response: "soft",
+            side: "center",
+            width: 2.46,
+            height: 1.48,
+            x: 0,
+            y: -0.02,
+            z: -0.1,
+          }),
+        ];
+
+        const reactionGroup = new THREE.Group();
+        portalGroup.add(reactionGroup);
+
+        const shadowMesh = new THREE.Mesh(
+          shadowGeometry,
+          new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.18,
+          })
+        );
+        shadowMesh.rotation.x = -1.08;
+        shadowMesh.position.set(0, -1.1, 0.2);
+        portalGroup.add(shadowMesh);
+
+        const motionShadowLeft = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.2, 1.8),
+          new THREE.MeshBasicMaterial({
+            color: 0x02070d,
+            transparent: true,
+            opacity: 0.0,
+          })
+        );
+        motionShadowLeft.position.set(-1.78, 0.0, -0.65);
+        portalGroup.add(motionShadowLeft);
+
+        const motionShadowRight = motionShadowLeft.clone();
+        motionShadowRight.position.x = 1.78;
+        portalGroup.add(motionShadowRight);
+
+        let audioContext = null;
+        let mediaSource = null;
+        let panner = null;
+        let dryGain = null;
+        let wetGain = null;
+        let convolver = null;
+        let presenceReverbGain = null;
+        let presenceConvolver = null;
+        let hls = null;
+
+        let settings = {
+          spatialAudioEnabled: true,
+          immersionLevel: 0.82,
+          headTrackingEnabled: true,
+          deviceMode: "phone",
+          anchorPersistenceEnabled: true,
+        };
+        let sceneConfig = null;
+        let environmentBrightness = 0.28;
+        let motionTarget = { x: 0, y: 0, magnitude: 0, userActive: 0 };
+        let smoothedMotion = { x: 0, y: 0 };
+        let cameraOffset = { x: 0, y: 0 };
+        let driftOffset = { x: 0, y: 0 };
+        let worldMotion = { x: 0, y: 0, z: 0 };
+        let deviceVelocity = { x: 0, y: 0 };
+        let anchorBroadcastAt = 0;
+        let anchorBridgeAt = 0;
+        let anchorDirty = false;
+        let materializeStart = performance.now();
+        let materializeRequested = true;
+        let frameState = {
+          color: new THREE.Color(0.36, 0.54, 0.8),
+          brightness: 0.42,
+          flash: 0.0,
+          centroidX: 0.0,
+          centroidY: 0.0,
+          motionEstimate: 0.0,
+          depthForeground: 0.62,
+          depthBackground: 0.28,
+        };
+        let previousBrightness = 0.42;
+        let expansionTick = 0;
+        let sceneAi = {
+          profile: "cinematic-procedural",
+          seedHint: 4172,
+          weatherBias: 0.34,
+          motionBias: 0.42,
+          extensionIntensity: 0.72,
+        };
+        let roomAiState = {
+          seed: 4172,
+          weatherMode: "mist",
+          horizonShift: 0,
+          ambientMotion: 0.42,
+          continuityDrift: 0.14,
+          extensionSeed: 4172,
+          memoryPulse: 0,
+        };
+        let continuityCache = {
+          left: null,
+          right: null,
+          top: null,
+          floor: null,
+        };
+
+        let presenceSession = null;
+        let roomState = null;
+        let localPeerId = null;
+        let localStream = null;
+        let localMicAnalyser = null;
+        let localMicData = null;
+        let signalingSocket = null;
+        let reconnectTimer = null;
+        let reconnectAttempt = 0;
+        const peerConnections = new Map();
+        const peerDataChannels = new Map();
+        const remoteAudioNodes = new Map();
+        const remoteAvatars = new Map();
+        let lastPresenceSend = 0;
+        let lastPlaybackSend = 0;
+        let lastAiStateSend = 0;
+        const raycaster = new THREE.Raycaster();
+        const pointerNdc = new THREE.Vector2(0, 0);
+        const interactionEffects = [];
+        const interactionField = {
+          energy: 0,
+          hold: 0,
+          left: 0,
+          right: 0,
+          center: 0,
+          lastSide: "center",
+          lastDepth: "mid",
+        };
+        const interactionState = {
+          down: false,
+          pointerX: 0,
+          pointerY: 0,
+          startX: 0,
+          startY: 0,
+          startTime: 0,
+          holdStarted: false,
+          holdStrength: 0,
+          tapBurst: 0,
+          lastTapTime: 0,
+          cooldown: 0,
+        };
+        let awarenessImpulse = 0;
+        let realityState = {
+          targetPosition: new THREE.Vector3(0, 0.04, -3.3),
+          currentPosition: new THREE.Vector3(0, 0.04, -3.3),
+          targetRotation: new THREE.Euler(0, 0, 0),
+          currentRotation: new THREE.Euler(0, 0, 0),
+          targetScale: 1.0,
+          currentScale: 1.0,
+          targetRoomScale: 1.0,
+          currentRoomScale: 1.0,
+          targetAmbientBlend: 0.5,
+          currentAmbientBlend: 0.5,
+          worldConfidence: 0.52,
+          recalibration: 0,
+        };
+        const tempWorldVector = new THREE.Vector3();
+        const tempWorldVectorB = new THREE.Vector3();
+
+        function createImpulseResponse(context, seconds, decay) {
+          const rate = context.sampleRate;
+          const length = rate * seconds;
+          const impulse = context.createBuffer(2, length, rate);
+          for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+            const data = impulse.getChannelData(channel);
+            for (let index = 0; index < length; index += 1) {
+              const n = length ? index / length : 0;
+              data[index] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
+            }
+          }
+          return impulse;
+        }
+
+        function seededGenerator(seed) {
+          let state = Math.floor(seed) % 2147483647;
+          if (state <= 0) {
+            state += 2147483646;
+          }
+          return () => {
+            state = (state * 16807) % 2147483647;
+            return (state - 1) / 2147483646;
+          };
+        }
+
+        function mixColorHex(color, amount) {
+          const clone = color.clone().lerp(new THREE.Color(0x0b1523), amount);
+          return `rgb(${Math.round(clone.r * 255)}, ${Math.round(clone.g * 255)}, ${Math.round(clone.b * 255)})`;
+        }
+
+        function clamp01(value) {
+          return THREE.MathUtils.clamp(value, 0, 1);
+        }
+
+        function normalizeTriple(value, fallback) {
+          if (!Array.isArray(value) || value.length < 3) {
+            return fallback.slice();
+          }
+          return value.slice(0, 3).map((entry) => Number(entry || 0));
+        }
+
+        function applyAnchorState(anchor, markDirty = false) {
+          if (!anchor) {
+            return;
+          }
+          const position = normalizeTriple(anchor.position, [0, 0.04, -3.3]);
+          const rotation = normalizeTriple(anchor.rotation, [0, 0, 0]);
+          realityState.targetPosition.set(position[0], position[1], position[2]);
+          realityState.currentPosition.lerp(realityState.targetPosition, 0.35);
+          realityState.targetRotation.set(rotation[0], rotation[1], rotation[2]);
+          realityState.currentRotation.x +=
+            (realityState.targetRotation.x - realityState.currentRotation.x) * 0.35;
+          realityState.currentRotation.y +=
+            (realityState.targetRotation.y - realityState.currentRotation.y) * 0.35;
+          realityState.currentRotation.z +=
+            (realityState.targetRotation.z - realityState.currentRotation.z) * 0.35;
+          realityState.targetScale = THREE.MathUtils.clamp(Number(anchor.scale || 1), 0.72, 1.45);
+          realityState.targetRoomScale = THREE.MathUtils.clamp(
+            Number(anchor.roomScale || 1),
+            0.7,
+            1.85
+          );
+          realityState.targetAmbientBlend = clamp01(
+            Number(anchor.ambientBlend ?? realityState.targetAmbientBlend)
+          );
+          if (markDirty) {
+            anchorDirty = true;
+          }
+        }
+
+        function currentAnchorSnapshot() {
+          return {
+            position: [
+              Number(realityState.currentPosition.x.toFixed(4)),
+              Number(realityState.currentPosition.y.toFixed(4)),
+              Number(realityState.currentPosition.z.toFixed(4)),
+            ],
+            rotation: [
+              Number(realityState.currentRotation.x.toFixed(4)),
+              Number(realityState.currentRotation.y.toFixed(4)),
+              Number(realityState.currentRotation.z.toFixed(4)),
+            ],
+            scale: Number(realityState.currentScale.toFixed(4)),
+            roomScale: Number(realityState.currentRoomScale.toFixed(4)),
+            ambientBlend: Number(realityState.currentAmbientBlend.toFixed(4)),
+            deviceMode: settings.deviceMode || "phone",
+            updatedAt: Date.now(),
+          };
+        }
+
+        function emitAnchorState(force = false) {
+          if (!sceneConfig) {
+            return;
+          }
+          const now = performance.now() / 1000;
+          if (!force && now - anchorBridgeAt < 0.8 && !anchorDirty) {
+            return;
+          }
+          anchorBridgeAt = now;
+          anchorDirty = false;
+          bridge({
+            type: "anchor-state",
+            anchor: currentAnchorSnapshot(),
+          });
+        }
+
+        function drawExpansionTexture(target, side) {
+          if (!sampleContext || !target.context) {
+            return;
+          }
+
+          const { canvas, context, texture } = target;
+          const width = sampleCanvas.width;
+          const height = sampleCanvas.height;
+          let strip;
+          if (side === "left") {
+            strip = sampleContext.getImageData(0, 0, 3, height);
+          } else if (side === "right") {
+            strip = sampleContext.getImageData(width - 3, 0, 3, height);
+          } else if (side === "top") {
+            strip = sampleContext.getImageData(0, 0, width, 3);
+          } else {
+            strip = sampleContext.getImageData(0, height - 3, width, 3);
+          }
+
+          const cacheKey = `${side}:${frameState.brightness.toFixed(3)}:${frameState.centroidX.toFixed(2)}:${frameState.centroidY.toFixed(2)}:${roomAiState.weatherMode}:${roomAiState.extensionSeed}`;
+          if (continuityCache[side] === cacheKey && expansionTick % 2 !== 0) {
+            return;
+          }
+          continuityCache[side] = cacheKey;
+
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.globalAlpha = 1;
+
+          if (side === "left" || side === "right") {
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = strip.width;
+            tempCanvas.height = strip.height;
+            tempCanvas.getContext("2d").putImageData(strip, 0, 0);
+            context.save();
+            if (side === "left") {
+              context.scale(-1, 1);
+              context.drawImage(tempCanvas, -canvas.width, 0, canvas.width, canvas.height);
+            } else {
+              context.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+            }
+            context.restore();
+          } else {
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = strip.width;
+            tempCanvas.height = strip.height;
+            tempCanvas.getContext("2d").putImageData(strip, 0, 0);
+            context.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+          }
+
+          const rand = seededGenerator(roomAiState.extensionSeed + side.charCodeAt(0) * 37 + expansionTick);
+          const intensity = sceneAi.extensionIntensity;
+          const weatherAlpha =
+            roomAiState.weatherMode === "drizzle"
+              ? 0.12 + sceneAi.weatherBias * 0.08
+              : 0.18 + sceneAi.weatherBias * 0.12;
+
+          const gradient = context.createLinearGradient(
+            0,
+            0,
+            side === "left" || side === "right" ? canvas.width : 0,
+            side === "top" || side === "floor" ? canvas.height : 0,
+          );
+          gradient.addColorStop(0, mixColorHex(frameState.color, 0.08));
+          gradient.addColorStop(1, mixColorHex(frameState.color, 0.52));
+          context.globalAlpha = 0.42 + intensity * 0.18;
+          context.fillStyle = gradient;
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          context.globalAlpha = weatherAlpha;
+          context.strokeStyle = mixColorHex(frameState.color.clone().offsetHSL(0.04, 0.03, 0.08), 0.12);
+          for (let index = 0; index < 18; index += 1) {
+            const x = rand() * canvas.width;
+            const y = rand() * canvas.height;
+            const length = 18 + rand() * 48 * (0.4 + roomAiState.ambientMotion);
+            context.beginPath();
+            if (roomAiState.weatherMode === "drizzle") {
+              context.moveTo(x, y);
+              context.lineTo(x - 4 - rand() * 12, y + length);
+            } else {
+              context.moveTo(x, y);
+              context.bezierCurveTo(
+                x + rand() * 26,
+                y + 10 + rand() * 10,
+                x - rand() * 30,
+                y + length * 0.6,
+                x + rand() * 18,
+                y + length,
+              );
+            }
+            context.stroke();
+          }
+
+          context.globalAlpha = 0.22 + roomAiState.memoryPulse * 0.18;
+          context.fillStyle = mixColorHex(frameState.color.clone().lerp(new THREE.Color(0xffcb9b), 0.35), 0.18);
+          for (let index = 0; index < 12; index += 1) {
+            const px = rand() * canvas.width;
+            const py = rand() * canvas.height;
+            const radius = 8 + rand() * 16 * (0.4 + sceneAi.motionBias);
+            context.beginPath();
+            context.arc(px, py, radius, 0, Math.PI * 2);
+            context.fill();
+          }
+
+          context.globalAlpha = 0.14 + frameState.motionEstimate * 0.12;
+          context.fillStyle = mixColorHex(frameState.color.clone().offsetHSL(-0.03, -0.02, -0.06), 0.32);
+          const horizon = canvas.height * (0.42 + roomAiState.horizonShift * 0.6);
+          context.fillRect(0, horizon, canvas.width, canvas.height - horizon);
+
+          texture.needsUpdate = true;
+        }
+
+        function ensureAudioGraph() {
+          if (audioContext) {
+            return;
+          }
+
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          mediaSource = audioContext.createMediaElementSource(video);
+          panner = audioContext.createPanner();
+          dryGain = audioContext.createGain();
+          wetGain = audioContext.createGain();
+          convolver = audioContext.createConvolver();
+          presenceConvolver = audioContext.createConvolver();
+          presenceReverbGain = audioContext.createGain();
+
+          convolver.buffer = createImpulseResponse(audioContext, 1.1, 2.4);
+          presenceConvolver.buffer = createImpulseResponse(audioContext, 0.9, 2.7);
+
+          panner.panningModel = "HRTF";
+          panner.distanceModel = "inverse";
+          panner.refDistance = 1;
+          panner.maxDistance = 8;
+          panner.rolloffFactor = 1.35;
+          panner.coneInnerAngle = 170;
+          panner.coneOuterAngle = 300;
+          panner.coneOuterGain = 0.2;
+
+          dryGain.gain.value = 0.92;
+          wetGain.gain.value = 0.17;
+          presenceReverbGain.gain.value = 0.11;
+
+          mediaSource.connect(panner);
+          panner.connect(dryGain);
+          panner.connect(convolver);
+          convolver.connect(wetGain);
+          dryGain.connect(audioContext.destination);
+          wetGain.connect(audioContext.destination);
+          presenceConvolver.connect(presenceReverbGain);
+          presenceReverbGain.connect(audioContext.destination);
+        }
+
+        function attachSource(media) {
+          if (!media) {
+            return;
+          }
+
+          if (hls) {
+            hls.destroy();
+            hls = null;
+          }
+
+          const source = media.hlsUrl || media.mp4Url;
+          if (!source) {
+            return;
+          }
+
+          if (media.hlsUrl && window.Hls && window.Hls.isSupported()) {
+            hls = new window.Hls({
+              enableWorker: true,
+              lowLatencyMode: false,
+            });
+            hls.loadSource(media.hlsUrl);
+            hls.attachMedia(video);
+          } else {
+            video.src = source;
+          }
+
+          video.play().catch(() => {});
+          ensureAudioGraph();
+        }
+
+        function beginMaterialization() {
+          materializeRequested = true;
+          materializeStart = performance.now();
+        }
+
+        function configure(payload) {
+          sceneConfig = payload;
+          presenceSession = payload.session || null;
+          environmentBrightness = THREE.MathUtils.clamp(
+            Number(payload.environmentBrightness ?? environmentBrightness),
+            0.08,
+            1.0
+          );
+          sceneAi = {
+            ...sceneAi,
+            ...(payload.ai || {}),
+          };
+          roomAiState = {
+            ...roomAiState,
+            seed: sceneAi.seedHint,
+            extensionSeed: sceneAi.seedHint,
+          };
+          applyAnchorState(payload.anchor, true);
+          attachSource(payload.media);
+          applySettings(settings);
+          beginMaterialization();
+          emitAnchorState(true);
+          if (presenceSession && presenceSession.presenceEnabled) {
+            ensurePresenceConnection();
+          }
+        }
+
+        function applySettings(next) {
+          settings = { ...settings, ...next };
+          sharedUniforms.immersion.value = settings.immersionLevel;
+          room.material.color.setScalar(0.034 + (1 - settings.immersionLevel) * 0.024);
+          if (dryGain) {
+            const enabled = settings.spatialAudioEnabled ? 1 : 0;
+            dryGain.gain.value = 0.9 * enabled;
+            wetGain.gain.value = (0.08 + settings.immersionLevel * 0.15) * enabled;
+            presenceReverbGain.gain.value = (0.06 + settings.immersionLevel * 0.08) * enabled;
+          }
+          anchorDirty = true;
+        }
+
+        function updateMotion(payload) {
+          motionTarget = payload;
+        }
+
+        function setPlayback(playing) {
+          const shouldPlay = !!playing;
+          if (presenceSession && presenceSession.presenceEnabled && !presenceSession.isHost) {
+            return;
+          }
+
+          if (shouldPlay) {
+            video.play().catch(() => {});
+            if (audioContext && audioContext.state === "suspended") {
+              audioContext.resume().catch(() => {});
+            }
+          } else {
+            video.pause();
+          }
+
+          if (presenceSession && presenceSession.presenceEnabled) {
+            sendSignal({
+              type: "playback-control",
+              roomId: presenceSession.roomId,
+              clientId: presenceSession.clientId,
+              playbackTime: video.currentTime,
+              playbackState: shouldPlay ? "playing" : "paused",
+            });
+          }
+        }
+
+        function setMuted(muted) {
+          video.muted = muted;
+          if (dryGain) {
+            const enabled = muted || !settings.spatialAudioEnabled ? 0 : 1;
+            dryGain.gain.value = 0.9 * enabled;
+            wetGain.gain.value = (0.08 + settings.immersionLevel * 0.15) * enabled;
+          }
+        }
+
+        function setListenerPosition(x, y, z) {
+          if (!audioContext) {
+            return;
+          }
+          const listener = audioContext.listener;
+          if (listener.positionX) {
+            listener.positionX.value = x;
+            listener.positionY.value = y;
+            listener.positionZ.value = z;
+            listener.forwardX.value = 0;
+            listener.forwardY.value = 0;
+            listener.forwardZ.value = -1;
+            listener.upX.value = 0;
+            listener.upY.value = 1;
+            listener.upZ.value = 0;
+          } else if (listener.setPosition) {
+            listener.setPosition(x, y, z);
+            listener.setOrientation(0, 0, -1, 0, 1, 0);
+          }
+        }
+
+        function sampleVideoState() {
+          if (!video.videoWidth || !sampleContext) {
+            return;
+          }
+
+          sampleContext.drawImage(video, 0, 0, sampleCanvas.width, sampleCanvas.height);
+          const pixels = sampleContext.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height).data;
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          let totalLuma = 0;
+          let weightedX = 0;
+          let weightedY = 0;
+
+          for (let y = 0; y < sampleCanvas.height; y += 1) {
+            for (let x = 0; x < sampleCanvas.width; x += 1) {
+              const index = (y * sampleCanvas.width + x) * 4;
+              const pr = pixels[index];
+              const pg = pixels[index + 1];
+              const pb = pixels[index + 2];
+              const luma = (0.299 * pr + 0.587 * pg + 0.114 * pb) / 255;
+              r += pr;
+              g += pg;
+              b += pb;
+              totalLuma += luma;
+              weightedX += (x / sampleCanvas.width - 0.5) * luma;
+              weightedY += (y / sampleCanvas.height - 0.5) * luma;
+            }
+          }
+
+          const count = sampleCanvas.width * sampleCanvas.height;
+          const averageBrightness = totalLuma / count;
+          const flash = Math.max(0, averageBrightness - previousBrightness);
+          const motionEstimate = Math.min(1, Math.abs(averageBrightness - previousBrightness) * 6);
+          const foregroundDepth = THREE.MathUtils.clamp(
+            0.46 + (1 - averageBrightness) * 0.3 + Math.abs(weightedX / Math.max(totalLuma, 0.001)) * 0.18,
+            0.38,
+            0.92,
+          );
+          const backgroundDepth = THREE.MathUtils.clamp(
+            0.18 + averageBrightness * 0.28 + sceneAi.motionBias * 0.08,
+            0.12,
+            0.58,
+          );
+          previousBrightness = averageBrightness;
+
+          frameState.brightness = averageBrightness;
+          frameState.flash = flash;
+          frameState.motionEstimate = motionEstimate;
+          frameState.centroidX = totalLuma > 0 ? weightedX / totalLuma : 0;
+          frameState.centroidY = totalLuma > 0 ? weightedY / totalLuma : 0;
+          frameState.depthForeground = foregroundDepth;
+          frameState.depthBackground = backgroundDepth;
+          frameState.color = new THREE.Color(
+            r / count / 255,
+            g / count / 255,
+            b / count / 255
+          );
+
+          sharedUniforms.brightness.value = averageBrightness;
+          sharedUniforms.motionEnergy.value = Math.min(
+            1,
+            motionEstimate * 0.7 + Math.abs(smoothedMotion.x) * 0.4 + Math.abs(smoothedMotion.y) * 0.25
+          );
+        }
+
+        function evolveAiScene(elapsed) {
+          if (!sceneConfig) {
+            return;
+          }
+
+          roomAiState.memoryPulse *= 0.986;
+          const targetAmbient =
+            0.16 +
+            frameState.motionEstimate * (0.28 + sceneAi.motionBias * 0.28) +
+            interactionField.energy * 0.16;
+          roomAiState.ambientMotion += (targetAmbient - roomAiState.ambientMotion) * 0.04;
+          roomAiState.continuityDrift +=
+            ((0.08 + Math.abs(frameState.centroidX) * 0.12 + interactionField.hold * 0.08) -
+              roomAiState.continuityDrift) *
+            0.03;
+          roomAiState.horizonShift +=
+            ((frameState.centroidY * 0.08 + Math.sin(elapsed * 0.08) * 0.02) - roomAiState.horizonShift) *
+            0.02;
+
+          if (presenceSession && presenceSession.isHost && elapsed - lastAiStateSend > 2.8) {
+            sendSignal({
+              type: "ai-scene-update",
+              roomId: presenceSession.roomId,
+              clientId: presenceSession.clientId,
+              aiState: {
+                weatherMode: roomAiState.weatherMode,
+                horizonShift: roomAiState.horizonShift,
+                ambientMotion: roomAiState.ambientMotion,
+                continuityDrift: roomAiState.continuityDrift,
+                extensionSeed: roomAiState.extensionSeed,
+                memoryPulse: roomAiState.memoryPulse,
+              },
+            });
+            lastAiStateSend = elapsed;
+          }
+        }
+
+        function updateExpansionPanels() {
+          expansionTick += 1;
+          drawExpansionTexture(leftExpansion, "left");
+          drawExpansionTexture(rightExpansion, "right");
+          drawExpansionTexture(topExpansion, "top");
+          drawExpansionTexture(floorExpansion, "floor");
+
+          const sideDrift = roomAiState.continuityDrift * 0.18 + interactionField.energy * 0.08;
+          leftExpansionMesh.material.opacity =
+            0.34 + sceneAi.extensionIntensity * 0.18 + interactionField.left * 0.12;
+          rightExpansionMesh.material.opacity =
+            0.34 + sceneAi.extensionIntensity * 0.18 + interactionField.right * 0.12;
+          topExpansionMesh.material.opacity =
+            0.28 + sceneAi.extensionIntensity * 0.12 + interactionField.center * 0.1;
+          floorExpansionMesh.material.opacity =
+            0.24 + sceneAi.extensionIntensity * 0.16 + roomAiState.memoryPulse * 0.12;
+
+          leftExpansionMesh.position.x = -1.88 - sideDrift;
+          rightExpansionMesh.position.x = 1.88 + sideDrift;
+          topExpansionMesh.position.y = 1.18 + roomAiState.horizonShift * 0.4;
+          floorExpansionMesh.position.y = -1.26 - roomAiState.horizonShift * 0.22;
+
+          leftExpansionMesh.rotation.y = 0.02 + frameState.depthBackground * 0.04;
+          rightExpansionMesh.rotation.y = -0.02 - frameState.depthBackground * 0.04;
+          topExpansionMesh.rotation.x = -0.01 + roomAiState.horizonShift * 0.04;
+          floorExpansionMesh.rotation.x = -0.08 - roomAiState.ambientMotion * 0.05;
+        }
+
+        function updateEnvironment(elapsed) {
+          const roomAdaptation =
+            realityState.currentAmbientBlend * 0.7 + environmentBrightness * 0.3;
+          const glowIntensity =
+            0.1 +
+            settings.immersionLevel * 0.18 +
+            frameState.brightness * (0.08 + roomAdaptation * 0.05) +
+            frameState.flash * 0.36;
+          const interactionGlow =
+            interactionField.energy * 0.3 + interactionField.hold * 0.22 + awarenessImpulse * 0.12;
+          const spillColor = frameState.color.clone().lerp(new THREE.Color(0x9fc4ea), 0.18);
+
+          keyLight.color.lerp(spillColor, 0.2);
+          keyLight.intensity = 0.9 + glowIntensity * 2.1 + interactionGlow * 1.4;
+
+          fillLight.color.lerp(spillColor.clone().offsetHSL(0.03, 0.02, 0.03), 0.14);
+          fillLight.intensity =
+            0.18 + glowIntensity * (0.48 + roomAdaptation * 0.32) + interactionGlow * 0.4;
+
+          ambient.color.lerp(spillColor.clone().multiplyScalar(0.9), 0.12);
+          ambient.intensity =
+            0.16 + glowIntensity * (0.36 + roomAdaptation * 0.28) + interactionGlow * 0.18;
+
+          [leftSpill, rightSpill, topSpill, floorSpill].forEach((mesh, index) => {
+            mesh.material.color.lerp(spillColor, 0.18);
+            const pulse = index === 3 ? 1.12 : 1.0;
+            const directionalBoost =
+              index === 0
+                ? interactionField.left * 0.22
+                : index === 1
+                  ? interactionField.right * 0.22
+                  : interactionField.center * 0.14;
+            mesh.material.opacity =
+              (0.035 +
+                glowIntensity * 0.18 +
+                frameState.motionEstimate * 0.06 +
+                directionalBoost +
+                interactionField.hold * 0.12) *
+              pulse;
+          });
+
+          room.material.color.lerp(
+            new THREE.Color(0x02070d).lerp(
+              spillColor,
+              0.06 + glowIntensity * 0.05 + roomAdaptation * 0.08
+            ),
+            0.08
+          );
+
+          auraMesh.material.opacity =
+            0.18 + glowIntensity * 0.18 + interactionField.energy * 0.18 + interactionField.hold * 0.16;
+          motionShadowLeft.material.opacity =
+            0.02 + frameState.motionEstimate * 0.12 + interactionField.left * 0.08;
+          motionShadowRight.material.opacity =
+            0.02 + frameState.motionEstimate * 0.12 + interactionField.right * 0.08;
+          motionShadowLeft.position.y = Math.sin(elapsed * 0.45) * 0.06;
+          motionShadowRight.position.y = Math.cos(elapsed * 0.52) * 0.06;
+
+          remoteAvatars.forEach((avatar) => {
+            avatar.glow.material.color.lerp(spillColor, 0.12);
+            avatar.body.material.color.lerp(spillColor.clone().lerp(new THREE.Color(avatar.baseColor), 0.55), 0.1);
+          });
+        }
+
+        function updateRealityAnchor(elapsed) {
+          const modeFactor = settings.deviceMode === "glasses" ? 0.45 : 1.0;
+          const motionMagnitude = THREE.MathUtils.clamp(
+            Math.abs(smoothedMotion.x) + Math.abs(smoothedMotion.y),
+            0,
+            1
+          );
+          const stableWindow = 1 - THREE.MathUtils.clamp(motionTarget.userActive * 0.82, 0, 0.82);
+          const roomBias = THREE.MathUtils.clamp(
+            0.88 + (window.innerWidth / Math.max(window.innerHeight, 1) - 0.56) * 0.18,
+            0.78,
+            1.28
+          );
+          const brightnessBias = THREE.MathUtils.clamp(
+            0.82 + (environmentBrightness - 0.28) * 0.28,
+            0.7,
+            1.2
+          );
+          realityState.targetRoomScale =
+            realityState.targetRoomScale * 0.96 + roomBias * brightnessBias * 0.04;
+          realityState.targetAmbientBlend = THREE.MathUtils.clamp(
+            realityState.targetAmbientBlend * 0.95 +
+              (0.28 + frameState.brightness * 0.26 + environmentBrightness * 0.22) *
+                0.05,
+            0.16,
+            0.92
+          );
+
+          worldMotion.x += ((smoothedMotion.x * 0.16 * modeFactor) - worldMotion.x) * 0.06;
+          worldMotion.y += ((-smoothedMotion.y * 0.11 * modeFactor) - worldMotion.y) * 0.06;
+          worldMotion.z +=
+            (((motionMagnitude - 0.08) * 0.1 * modeFactor) - worldMotion.z) * 0.04;
+          deviceVelocity.x += (motionTarget.x - smoothedMotion.x - deviceVelocity.x) * 0.1;
+          deviceVelocity.y += (motionTarget.y - smoothedMotion.y - deviceVelocity.y) * 0.1;
+
+          const presenceBreath = motionTarget.userActive > 0.5 ? 0 : Math.sin(elapsed * 0.12) * 0.012;
+          const targetX =
+            realityState.targetPosition.x + worldMotion.x * stableWindow + deviceVelocity.x * 0.018;
+          const targetY =
+            realityState.targetPosition.y +
+            worldMotion.y * stableWindow +
+            presenceBreath +
+            interactionField.hold * 0.02;
+          const targetZ =
+            realityState.targetPosition.z -
+            worldMotion.z * stableWindow -
+            interactionField.energy * 0.03;
+
+          realityState.currentPosition.x += (targetX - realityState.currentPosition.x) * 0.08;
+          realityState.currentPosition.y += (targetY - realityState.currentPosition.y) * 0.08;
+          realityState.currentPosition.z += (targetZ - realityState.currentPosition.z) * 0.08;
+
+          const targetRotX =
+            realityState.targetRotation.x +
+            smoothedMotion.y * 0.045 * modeFactor +
+            interactionField.center * 0.012;
+          const targetRotY =
+            realityState.targetRotation.y -
+            smoothedMotion.x * 0.065 * modeFactor +
+            (interactionField.right - interactionField.left) * 0.03;
+          const targetRotZ =
+            realityState.targetRotation.z + deviceVelocity.x * 0.012 * stableWindow;
+          realityState.currentRotation.x += (targetRotX - realityState.currentRotation.x) * 0.08;
+          realityState.currentRotation.y += (targetRotY - realityState.currentRotation.y) * 0.08;
+          realityState.currentRotation.z += (targetRotZ - realityState.currentRotation.z) * 0.08;
+
+          realityState.currentScale +=
+            (realityState.targetScale * roomBias - realityState.currentScale) * 0.06;
+          realityState.currentRoomScale +=
+            (realityState.targetRoomScale - realityState.currentRoomScale) * 0.04;
+          realityState.currentAmbientBlend +=
+            (realityState.targetAmbientBlend - realityState.currentAmbientBlend) * 0.05;
+          realityState.worldConfidence +=
+            ((0.48 + stableWindow * 0.42 - motionMagnitude * 0.18) - realityState.worldConfidence) *
+            0.04;
+
+          anchorRig.position.copy(realityState.currentPosition);
+          anchorRig.rotation.copy(realityState.currentRotation);
+          anchorRig.scale.setScalar(realityState.currentScale);
+          room.scale.setScalar(realityState.currentRoomScale);
+
+          if (presenceGroup) {
+            presenceGroup.position.y = -0.06 + (1 - realityState.currentRoomScale) * 0.04;
+          }
+        }
+
+        function updateDepthLayers() {
+          const activeMotion = motionTarget.userActive > 0.5 ? 1 : 0;
+          const tiltX = smoothedMotion.x;
+          const tiltY = smoothedMotion.y;
+          const centroidX = frameState.centroidX;
+          const centroidY = frameState.centroidY;
+          const baseDepth =
+            settings.immersionLevel * 0.06 + (frameState.depthForeground - frameState.depthBackground) * 0.035;
+
+          backgroundLayer.position.x = -(tiltX * 0.05 + centroidX * 0.03);
+          backgroundLayer.position.y = tiltY * 0.028 + centroidY * 0.02;
+          backgroundLayer.scale.setScalar(1.0 - baseDepth * 0.22);
+
+          midLayer.position.x = centroidX * 0.015;
+          midLayer.position.y = centroidY * 0.012;
+          midLayer.scale.setScalar(1.0);
+
+          foregroundLayer.position.x = tiltX * 0.08 + centroidX * 0.06;
+          foregroundLayer.position.y =
+            -tiltY * 0.045 - centroidY * 0.04 + awarenessImpulse * 0.012;
+          foregroundLayer.scale.setScalar(1.0 + baseDepth * 0.5);
+
+          auraMesh.position.x = tiltX * 0.06;
+          auraMesh.position.y = -tiltY * 0.03;
+
+          const driftSuppression = activeMotion ? 0.1 : 1.0;
+          portalGroup.rotation.y =
+            tiltX * 0.075 +
+            driftOffset.x * driftSuppression +
+            (interactionField.right - interactionField.left) * 0.04;
+          portalGroup.rotation.x =
+            tiltY * 0.05 +
+            driftOffset.y * driftSuppression +
+            interactionField.center * 0.018;
+          portalGroup.position.x = cameraOffset.x * 0.6 + driftOffset.x * 0.22 * driftSuppression;
+          portalGroup.position.y =
+            0.04 +
+            cameraOffset.y * 0.46 +
+            driftOffset.y * 0.26 * driftSuppression +
+            interactionField.hold * 0.03;
+        }
+
+        function createAvatar(peer) {
+          const baseColor = [0x77bfff, 0xffba7b, 0x96ffd0, 0xd58fff, 0x7ef1ff, 0xff86cb][peer.slotIndex % 6];
+          const group = new THREE.Group();
+          const body = new THREE.Mesh(
+            new THREE.SphereGeometry(0.13, 22, 22),
+            new THREE.MeshStandardMaterial({
+              color: baseColor,
+              emissive: baseColor,
+              emissiveIntensity: 0.35,
+              roughness: 0.32,
+              metalness: 0.08,
+              transparent: true,
+              opacity: 0.92,
+            })
+          );
+          const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.24, 18, 18),
+            new THREE.MeshBasicMaterial({
+              color: baseColor,
+              transparent: true,
+              opacity: 0.16,
+              blending: THREE.AdditiveBlending,
+            })
+          );
+          const groundShadow = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.52, 0.28),
+            new THREE.MeshBasicMaterial({
+              color: 0x000000,
+              transparent: true,
+              opacity: 0.12,
+            })
+          );
+          groundShadow.rotation.x = -1.18;
+          groundShadow.position.y = -0.28;
+          group.add(groundShadow);
+          group.add(glow);
+          group.add(body);
+          presenceGroup.add(group);
+          return {
+            id: peer.id,
+            root: group,
+            body,
+            glow,
+            groundShadow,
+            currentPosition: new THREE.Vector3(...peer.position),
+            targetPosition: new THREE.Vector3(...peer.position),
+            currentOrientation: new THREE.Euler(),
+            targetOrientation: new THREE.Euler(...peer.orientation),
+            speakingLevel: 0,
+            targetSpeakingLevel: peer.speakingLevel || 0,
+            reactionPulse: 0,
+            baseColor,
+          };
+        }
+
+        function removeAvatar(peerId) {
+          const avatar = remoteAvatars.get(peerId);
+          if (!avatar) {
+            return;
+          }
+          presenceGroup.remove(avatar.root);
+          remoteAvatars.delete(peerId);
+        }
+
+        function syncAvatarsFromRoom(room) {
+          room.peers
+            .filter((peer) => peer.id !== localPeerId)
+            .forEach((peer) => {
+              if (!remoteAvatars.has(peer.id)) {
+                remoteAvatars.set(peer.id, createAvatar(peer));
+              }
+              const avatar = remoteAvatars.get(peer.id);
+              avatar.targetPosition.set(peer.position[0], peer.position[1], peer.position[2]);
+              avatar.targetOrientation.set(peer.orientation[0], peer.orientation[1], peer.orientation[2]);
+              avatar.targetSpeakingLevel = peer.speakingLevel || 0;
+              if (peer.reaction) {
+                avatar.reactionPulse = 1.0;
+              }
+            });
+
+          Array.from(remoteAvatars.keys()).forEach((peerId) => {
+            if (!room.peers.some((peer) => peer.id === peerId)) {
+              removeAvatar(peerId);
+            }
+          });
+        }
+
+        function updateAvatars(elapsed) {
+          remoteAvatars.forEach((avatar, peerId) => {
+            avatar.currentPosition.lerp(avatar.targetPosition, 0.12);
+            avatar.currentOrientation.x += (avatar.targetOrientation.x - avatar.currentOrientation.x) * 0.12;
+            avatar.currentOrientation.y += (avatar.targetOrientation.y - avatar.currentOrientation.y) * 0.12;
+            avatar.currentOrientation.z += (avatar.targetOrientation.z - avatar.currentOrientation.z) * 0.12;
+            avatar.speakingLevel += (avatar.targetSpeakingLevel - avatar.speakingLevel) * 0.18;
+            avatar.reactionPulse *= 0.94;
+
+            const proximity = THREE.MathUtils.clamp(1.7 / Math.abs(avatar.currentPosition.z || -2.2), 0.72, 1.2);
+            avatar.root.position.copy(avatar.currentPosition);
+            avatar.root.rotation.copy(avatar.currentOrientation);
+            avatar.root.scale.setScalar(proximity);
+
+            const breath = Math.sin(elapsed * 1.3 + avatar.currentPosition.x) * 0.012;
+            avatar.body.position.y = breath + avatar.speakingLevel * 0.05;
+            avatar.glow.scale.setScalar(1 + avatar.speakingLevel * 0.5 + avatar.reactionPulse * 0.3);
+            avatar.glow.material.opacity = 0.12 + avatar.speakingLevel * 0.24 + avatar.reactionPulse * 0.12;
+            avatar.body.material.emissiveIntensity =
+              0.2 + avatar.speakingLevel * 0.9 + avatar.reactionPulse * 0.25;
+            avatar.groundShadow.material.opacity = 0.08 + avatar.speakingLevel * 0.08;
+          });
+        }
+
+        function ensurePresenceConnection() {
+          if (!presenceSession || signalingSocket) {
+            return;
+          }
+
+          ensureLocalMedia()
+            .catch((error) => {
+              bridge({ type: "presence-error", message: String(error) });
+            })
+            .finally(() => {
+              connectSignaling();
+            });
+        }
+
+        async function ensureLocalMedia() {
+          if (localStream || !presenceSession || !presenceSession.presenceEnabled) {
+            return;
+          }
+          ensureAudioGraph();
+          localStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+
+          const micSource = audioContext.createMediaStreamSource(localStream);
+          localMicAnalyser = audioContext.createAnalyser();
+          localMicAnalyser.fftSize = 256;
+          localMicData = new Uint8Array(localMicAnalyser.frequencyBinCount);
+          micSource.connect(localMicAnalyser);
+        }
+
+        function connectSignaling() {
+          if (!presenceSession || signalingSocket) {
+            return;
+          }
+
+          signalingSocket = new WebSocket(sceneConfig.signalingUrl);
+          signalingSocket.onopen = () => {
+            reconnectAttempt = 0;
+            sendSignal({
+              type: "join-room",
+              roomId: presenceSession.roomId,
+              clientId: presenceSession.clientId,
+              role: presenceSession.isHost ? "host" : "observer",
+            });
+          };
+          signalingSocket.onmessage = (event) => handleSignal(JSON.parse(event.data));
+          signalingSocket.onerror = () => {};
+          signalingSocket.onclose = () => {
+            signalingSocket = null;
+            clearTimeout(reconnectTimer);
+            reconnectAttempt += 1;
+            const delay = Math.min(5000, 700 * reconnectAttempt);
+            reconnectTimer = setTimeout(connectSignaling, delay);
+          };
+        }
+
+        function sendSignal(payload) {
+          if (!presenceSession || !signalingSocket || signalingSocket.readyState !== WebSocket.OPEN) {
+            return;
+          }
+          signalingSocket.send(JSON.stringify(payload));
+        }
+
+        async function handleSignal(message) {
+          switch (message.type) {
+            case "room-state":
+              roomState = message.room;
+              localPeerId = message.selfId;
+              if (roomState.aiState) {
+                roomAiState = { ...roomAiState, ...roomState.aiState };
+              }
+              if (roomState.anchorState) {
+                applyAnchorState(roomState.anchorState, !presenceSession?.isHost);
+              }
+              syncAvatarsFromRoom(roomState);
+              if (presenceSession && !presenceSession.isHost) {
+                applyRemotePlaybackState(roomState);
+              }
+              for (const peer of roomState.peers) {
+                if (peer.id !== localPeerId && !peerConnections.has(peer.id)) {
+                  await createPeerConnection(peer.id, true);
+                }
+              }
+              break;
+            case "presence-state":
+              roomState = message.room;
+              if (roomState.aiState) {
+                roomAiState = { ...roomAiState, ...roomState.aiState };
+              }
+              if (roomState.anchorState) {
+                applyAnchorState(roomState.anchorState, !presenceSession?.isHost);
+              }
+              syncAvatarsFromRoom(roomState);
+              break;
+            case "playback-state":
+              roomState = message.room;
+              if (roomState.aiState) {
+                roomAiState = { ...roomAiState, ...roomState.aiState };
+              }
+              if (roomState.anchorState) {
+                applyAnchorState(roomState.anchorState, !presenceSession?.isHost);
+              }
+              if (presenceSession && !presenceSession.isHost) {
+                applyRemotePlaybackState(roomState);
+              }
+              break;
+            case "ai-scene-state":
+              roomState = message.room;
+              if (roomState.aiState) {
+                roomAiState = { ...roomAiState, ...roomState.aiState };
+              }
+              break;
+            case "anchor-state":
+              roomState = message.room;
+              if (roomState.anchorState) {
+                applyAnchorState(roomState.anchorState, !presenceSession?.isHost);
+              }
+              break;
+            case "offer":
+              await acceptOffer(message);
+              break;
+            case "answer":
+              await acceptAnswer(message);
+              break;
+            case "ice-candidate":
+              await acceptIceCandidate(message);
+              break;
+            case "peer-left":
+              teardownPeer(message.clientId);
+              removeAvatar(message.clientId);
+              break;
+          }
+        }
+
+        function createPeerConnection(peerId, initiator) {
+          if (peerConnections.has(peerId)) {
+            return peerConnections.get(peerId).promise;
+          }
+
+          const promise = (async () => {
+            const peerConnection = new RTCPeerConnection({
+              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+            });
+
+            if (localStream) {
+              localStream.getTracks().forEach((track) => {
+                peerConnection.addTrack(track, localStream);
+              });
+            }
+
+            peerConnection.onicecandidate = (event) => {
+              if (!event.candidate) {
+                return;
+              }
+              sendSignal({
+                type: "ice-candidate",
+                roomId: presenceSession.roomId,
+                clientId: presenceSession.clientId,
+                targetId: peerId,
+                candidate: event.candidate,
+              });
+            };
+
+            peerConnection.ontrack = (event) => {
+              attachRemoteAudio(peerId, event.streams[0]);
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+              if (["failed", "closed", "disconnected"].includes(peerConnection.connectionState)) {
+                teardownPeer(peerId);
+              }
+            };
+
+            peerConnection.ondatachannel = (event) => {
+              bindPeerDataChannel(peerId, event.channel);
+            };
+
+            if (initiator) {
+              const channel = peerConnection.createDataChannel("presence");
+              bindPeerDataChannel(peerId, channel);
+              const offer = await peerConnection.createOffer({
+                offerToReceiveAudio: true,
+              });
+              await peerConnection.setLocalDescription(offer);
+              sendSignal({
+                type: "offer",
+                roomId: presenceSession.roomId,
+                clientId: presenceSession.clientId,
+                targetId: peerId,
+                sdp: offer,
+              });
+            }
+
+            peerConnections.set(peerId, { pc: peerConnection, promise: Promise.resolve() });
+          })();
+
+          peerConnections.set(peerId, { pc: null, promise });
+          return promise;
+        }
+
+        function bindPeerDataChannel(peerId, channel) {
+          peerDataChannels.set(peerId, channel);
+          channel.onmessage = (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              if (payload.type === "presence-micro" && remoteAvatars.has(peerId)) {
+                const avatar = remoteAvatars.get(peerId);
+                avatar.targetSpeakingLevel = payload.speakingLevel || avatar.targetSpeakingLevel;
+              }
+              if (payload.type === "reaction" && remoteAvatars.has(peerId)) {
+                remoteAvatars.get(peerId).reactionPulse = 1.0;
+              }
+              if (payload.type === "interaction-event") {
+                handleRemoteInteraction(payload.event);
+              }
+            } catch (_) {}
+          };
+        }
+
+        async function acceptOffer(message) {
+          await createPeerConnection(message.clientId, false);
+          const record = peerConnections.get(message.clientId);
+          const peerConnection = record.pc;
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(message.sdp));
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          sendSignal({
+            type: "answer",
+            roomId: presenceSession.roomId,
+            clientId: presenceSession.clientId,
+            targetId: message.clientId,
+            sdp: answer,
+          });
+        }
+
+        async function acceptAnswer(message) {
+          const record = peerConnections.get(message.clientId);
+          if (!record || !record.pc) {
+            return;
+          }
+          await record.pc.setRemoteDescription(new RTCSessionDescription(message.sdp));
+        }
+
+        async function acceptIceCandidate(message) {
+          const record = peerConnections.get(message.clientId);
+          if (!record || !record.pc || !message.candidate) {
+            return;
+          }
+          try {
+            await record.pc.addIceCandidate(new RTCIceCandidate(message.candidate));
+          } catch (_) {}
+        }
+
+        function attachRemoteAudio(peerId, stream) {
+          ensureAudioGraph();
+          if (remoteAudioNodes.has(peerId)) {
+            return;
+          }
+
+          const source = audioContext.createMediaStreamSource(stream);
+          const peerPanner = audioContext.createPanner();
+          const peerFilter = audioContext.createBiquadFilter();
+          const peerGain = audioContext.createGain();
+          const peerSend = audioContext.createGain();
+
+          peerPanner.panningModel = "HRTF";
+          peerPanner.distanceModel = "inverse";
+          peerPanner.refDistance = 0.7;
+          peerPanner.maxDistance = 10;
+          peerPanner.rolloffFactor = 1.45;
+          peerPanner.coneInnerAngle = 180;
+          peerPanner.coneOuterAngle = 300;
+          peerPanner.coneOuterGain = 0.22;
+
+          peerFilter.type = "lowpass";
+          peerFilter.frequency.value = 16000;
+          peerGain.gain.value = 0.0;
+          peerSend.gain.value = 0.16;
+
+          source.connect(peerPanner);
+          peerPanner.connect(peerFilter);
+          peerFilter.connect(peerGain);
+          peerFilter.connect(peerSend);
+          peerGain.connect(audioContext.destination);
+          peerSend.connect(presenceConvolver);
+
+          remoteAudioNodes.set(peerId, {
+            source,
+            panner: peerPanner,
+            filter: peerFilter,
+            gain: peerGain,
+            send: peerSend,
+          });
+        }
+
+        function teardownPeer(peerId) {
+          const record = peerConnections.get(peerId);
+          if (record && record.pc) {
+            record.pc.close();
+          }
+          peerConnections.delete(peerId);
+          if (peerDataChannels.has(peerId)) {
+            peerDataChannels.get(peerId).close();
+            peerDataChannels.delete(peerId);
+          }
+          const audioNodes = remoteAudioNodes.get(peerId);
+          if (audioNodes) {
+            try {
+              audioNodes.source.disconnect();
+              audioNodes.panner.disconnect();
+              audioNodes.filter.disconnect();
+              audioNodes.gain.disconnect();
+              audioNodes.send.disconnect();
+            } catch (_) {}
+            remoteAudioNodes.delete(peerId);
+          }
+        }
+
+        function applyRemotePlaybackState(nextRoom) {
+          if (!nextRoom) {
+            return;
+          }
+          const delta = nextRoom.playbackTime - video.currentTime;
+          if (Math.abs(delta) > 0.45) {
+            video.currentTime = nextRoom.playbackTime;
+          } else if (Math.abs(delta) > 0.08) {
+            video.playbackRate = THREE.MathUtils.clamp(1 + delta * 0.12, 0.94, 1.06);
+          } else {
+            video.playbackRate += (1 - video.playbackRate) * 0.18;
+          }
+
+          if (nextRoom.playbackState === "paused") {
+            video.pause();
+          } else {
+            video.play().catch(() => {});
+          }
+        }
+
+        function getLocalSpeakingLevel() {
+          if (!localMicAnalyser || !localMicData) {
+            return 0;
+          }
+          localMicAnalyser.getByteFrequencyData(localMicData);
+          let total = 0;
+          for (let index = 0; index < localMicData.length; index += 1) {
+            total += localMicData[index];
+          }
+          return Math.min(1, total / localMicData.length / 92);
+        }
+
+        function getAimPointer(clientX, clientY) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+          const ny = -(((clientY - rect.top) / rect.height) * 2 - 1);
+          pointerNdc.x = nx * 0.72;
+          pointerNdc.y = ny * 0.72;
+          return pointerNdc;
+        }
+
+        function resolveInteraction(clientX, clientY) {
+          const pointer = getAimPointer(clientX, clientY);
+          raycaster.setFromCamera(pointer, camera);
+          const hits = raycaster.intersectObjects(interactionZones, false);
+          if (!hits.length) {
+            return null;
+          }
+
+          const hit = hits[0];
+          const localPoint = portalGroup.worldToLocal(hit.point.clone());
+          const side =
+            localPoint.x < -0.28 ? "left" : localPoint.x > 0.28 ? "right" : "center";
+
+          return {
+            zoneId: hit.object.userData.id,
+            response: hit.object.userData.response,
+            depth: hit.object.userData.depth,
+            side,
+            point: localPoint,
+            normalized: {
+              x: THREE.MathUtils.clamp(localPoint.x / 1.43, -1, 1),
+              y: THREE.MathUtils.clamp(localPoint.y / 0.83, -1, 1),
+            },
+          };
+        }
+
+        function zoneDepthValue(depth) {
+          if (depth === "foreground") {
+            return 0.12;
+          }
+          if (depth === "background") {
+            return -0.04;
+          }
+          return 0.03;
+        }
+
+        function reactionProfile(response) {
+          if (response === "soft") {
+            return { color: 0x89dbff, spread: 0.34, tone: 260, decay: 0.96 };
+          }
+          if (response === "living") {
+            return { color: 0xffc88f, spread: 0.26, tone: 410, decay: 0.94 };
+          }
+          return { color: 0xc8efff, spread: 0.2, tone: 320, decay: 0.95 };
+        }
+
+        function playInteractionCue(interaction, intensity) {
+          if (!audioContext || !settings.spatialAudioEnabled) {
+            return;
+          }
+
+          const profile = reactionProfile(interaction.response);
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          const filter = audioContext.createBiquadFilter();
+          const pannerNode = audioContext.createPanner();
+          const send = audioContext.createGain();
+          const now = audioContext.currentTime;
+
+          filter.type = interaction.response === "hard" ? "bandpass" : "lowpass";
+          filter.frequency.value = profile.tone + intensity * 140;
+          oscillator.type = interaction.response === "living" ? "triangle" : "sine";
+          oscillator.frequency.setValueAtTime(profile.tone + intensity * 80, now);
+          oscillator.frequency.exponentialRampToValueAtTime(
+            profile.tone * 0.72,
+            now + 0.22,
+          );
+
+          pannerNode.panningModel = "HRTF";
+          pannerNode.distanceModel = "inverse";
+          pannerNode.refDistance = 0.6;
+          pannerNode.maxDistance = 8;
+          pannerNode.rolloffFactor = 1.2;
+          tempWorldVector.set(
+            interaction.point.x * 0.8,
+            interaction.point.y * 0.32,
+            -1.4 + zoneDepthValue(interaction.depth)
+          );
+          portalGroup.localToWorld(tempWorldVector);
+          pannerNode.positionX.value = tempWorldVector.x;
+          pannerNode.positionY.value = tempWorldVector.y;
+          pannerNode.positionZ.value = tempWorldVector.z;
+
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.exponentialRampToValueAtTime(0.028 + intensity * 0.04, now + 0.018);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34);
+
+          send.gain.value = 0.06 + intensity * 0.08;
+
+          oscillator.connect(filter);
+          filter.connect(pannerNode);
+          pannerNode.connect(gain);
+          pannerNode.connect(send);
+          gain.connect(audioContext.destination);
+          send.connect(presenceConvolver);
+
+          oscillator.start(now);
+          oscillator.stop(now + 0.36);
+        }
+
+        function spawnInteractionEffect(interaction, intensity, source) {
+          const profile = reactionProfile(interaction.response);
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.03, 0.048, 48),
+            new THREE.MeshBasicMaterial({
+              color: profile.color,
+              transparent: true,
+              opacity: 0.52,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            })
+          );
+          const pulse = new THREE.Mesh(
+            new THREE.CircleGeometry(0.08, 32),
+            new THREE.MeshBasicMaterial({
+              color: profile.color,
+              transparent: true,
+              opacity: 0.12,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            })
+          );
+          const localPoint = interaction.point.clone();
+          localPoint.z = zoneDepthValue(interaction.depth);
+          ring.position.copy(localPoint);
+          pulse.position.copy(localPoint);
+          reactionGroup.add(ring);
+          reactionGroup.add(pulse);
+
+          interactionEffects.push({
+            type: source,
+            response: interaction.response,
+            side: interaction.side,
+            ring,
+            pulse,
+            age: 0,
+            intensity,
+            spread: profile.spread,
+            decay: profile.decay,
+          });
+
+          interactionField.energy = Math.min(1, interactionField.energy + intensity * 0.9);
+          interactionField.hold = source === "hold" ? Math.min(1, interactionField.hold + intensity) : interactionField.hold;
+          interactionField[interaction.side] = Math.min(1, interactionField[interaction.side] + intensity * 0.7);
+          interactionField.lastSide = interaction.side;
+          interactionField.lastDepth = interaction.depth;
+
+          if (interaction.response === "living") {
+            awarenessImpulse = Math.min(1, awarenessImpulse + intensity * 0.8);
+            remoteAvatars.forEach((avatar) => {
+              avatar.reactionPulse = Math.max(avatar.reactionPulse, intensity * 0.8);
+            });
+          }
+
+          playInteractionCue(interaction, intensity);
+        }
+
+        function emitInteraction(kind, interaction, rawIntensity, shouldSync = true) {
+          const damping = 1 - Math.min(0.72, interactionState.cooldown);
+          const intensity = THREE.MathUtils.clamp(rawIntensity * damping, 0.12, 1);
+          interactionState.cooldown = Math.min(1.2, interactionState.cooldown + intensity * 0.34);
+          spawnInteractionEffect(interaction, intensity, kind);
+
+          if (shouldSync && presenceSession && presenceSession.presenceEnabled) {
+            const payload = {
+              type: "interaction-event",
+              event: {
+                kind,
+                zoneId: interaction.zoneId,
+                response: interaction.response,
+                depth: interaction.depth,
+                side: interaction.side,
+                x: interaction.normalized.x,
+                y: interaction.normalized.y,
+                intensity,
+              },
+            };
+            broadcastPeerData(payload);
+            if (presenceSession.isHost) {
+              sendSignal({
+                type: "scene-memory-event",
+                roomId: presenceSession.roomId,
+                clientId: presenceSession.clientId,
+                event: {
+                  type: kind,
+                  zoneId: interaction.zoneId,
+                  intensity,
+                },
+              });
+            }
+          }
+        }
+
+        function handleRemoteInteraction(event) {
+          if (!event) {
+            return;
+          }
+          const interaction = {
+            zoneId: event.zoneId || "remote",
+            response: event.response || "soft",
+            depth: event.depth || "mid",
+            side: event.side || "center",
+            point: new THREE.Vector3(
+              (event.x || 0) * 1.43,
+              (event.y || 0) * 0.83,
+              zoneDepthValue(event.depth || "mid"),
+            ),
+            normalized: {
+              x: event.x || 0,
+              y: event.y || 0,
+            },
+          };
+          spawnInteractionEffect(interaction, event.intensity || 0.3, "remote");
+        }
+
+        function updateInteractionEffects() {
+          interactionState.cooldown *= 0.986;
+          interactionField.energy *= 0.94;
+          interactionField.hold *= 0.9;
+          interactionField.left *= 0.92;
+          interactionField.right *= 0.92;
+          interactionField.center *= 0.92;
+          awarenessImpulse *= 0.94;
+
+          for (let index = interactionEffects.length - 1; index >= 0; index -= 1) {
+            const effect = interactionEffects[index];
+            effect.age += 0.016;
+            const progress = effect.age / (effect.response === "hard" ? 0.62 : 0.88);
+            if (progress >= 1) {
+              reactionGroup.remove(effect.ring);
+              reactionGroup.remove(effect.pulse);
+              interactionEffects.splice(index, 1);
+              continue;
+            }
+            const eased = 1 - Math.pow(1 - progress, 2.2);
+            const ringScale = 1 + eased * (1.8 + effect.spread * 4.2) * effect.intensity;
+            const pulseScale = 1 + eased * (2.4 + effect.spread * 5.2) * effect.intensity;
+            effect.ring.scale.setScalar(ringScale);
+            effect.pulse.scale.setScalar(pulseScale);
+            effect.ring.material.opacity =
+              (1 - progress) * (effect.response === "hard" ? 0.6 : 0.42) * effect.intensity;
+            effect.pulse.material.opacity =
+              (1 - progress) * (effect.response === "living" ? 0.2 : 0.14) * effect.intensity;
+          }
+        }
+
+        function broadcastPeerData(payload) {
+          peerDataChannels.forEach((channel) => {
+            if (channel.readyState === "open") {
+              channel.send(JSON.stringify(payload));
+            }
+          });
+        }
+
+        function updatePresence(elapsed) {
+          if (!presenceSession || !presenceSession.presenceEnabled || !roomState) {
+            return;
+          }
+
+          const speakingLevel = getLocalSpeakingLevel();
+          if (elapsed - lastPresenceSend > 0.12) {
+            sendSignal({
+              type: "presence-update",
+              roomId: presenceSession.roomId,
+              clientId: presenceSession.clientId,
+              orientation: [camera.rotation.x, camera.rotation.y, camera.rotation.z],
+              speakingLevel,
+            });
+            broadcastPeerData({
+              type: "presence-micro",
+              speakingLevel,
+              orientation: [camera.rotation.x, camera.rotation.y, camera.rotation.z],
+            });
+            lastPresenceSend = elapsed;
+          }
+
+          if (presenceSession.isHost && elapsed - lastPlaybackSend > 1.2) {
+            sendSignal({
+              type: "sync-playback",
+              roomId: presenceSession.roomId,
+              clientId: presenceSession.clientId,
+              playbackTime: video.currentTime,
+              playbackState: video.paused ? "paused" : "playing",
+            });
+            lastPlaybackSend = elapsed;
+          }
+
+          if (presenceSession.isHost && elapsed - anchorBroadcastAt > 0.9) {
+            sendSignal({
+              type: "anchor-update",
+              roomId: presenceSession.roomId,
+              clientId: presenceSession.clientId,
+              anchorState: currentAnchorSnapshot(),
+            });
+            anchorBroadcastAt = elapsed;
+          }
+
+          roomState.peers
+            .filter((peer) => peer.id !== localPeerId)
+            .forEach((peer) => {
+              const avatar = remoteAvatars.get(peer.id);
+              const audio = remoteAudioNodes.get(peer.id);
+              if (!avatar || !audio) {
+                return;
+              }
+              avatar.root.getWorldPosition(tempWorldVector);
+              const distance = Math.max(0.6, tempWorldVector.distanceTo(camera.position));
+              audio.panner.positionX.value = tempWorldVector.x;
+              audio.panner.positionY.value = tempWorldVector.y + 0.08;
+              audio.panner.positionZ.value = tempWorldVector.z;
+              audio.gain.gain.value +=
+                (((settings.spatialAudioEnabled ? 1 : 0) * THREE.MathUtils.clamp(1.8 / distance, 0.15, 1.1)) -
+                  audio.gain.gain.value) *
+                0.16;
+              tempWorldVectorB.subVectors(tempWorldVector, camera.position);
+              const behind = tempWorldVectorB.z < -2.6 ? 1 : 0;
+              audio.filter.frequency.value =
+                7000 + (1 - behind) * 7000 - avatar.speakingLevel * 600;
+              audio.send.gain.value = 0.05 + THREE.MathUtils.clamp(1.0 / distance, 0.06, 0.22);
+            });
+        }
+
+        function handlePointerDown(event) {
+          interactionState.down = true;
+          interactionState.startTime = performance.now();
+          interactionState.startX = event.clientX;
+          interactionState.startY = event.clientY;
+          interactionState.pointerX = event.clientX;
+          interactionState.pointerY = event.clientY;
+          interactionState.holdStarted = false;
+          interactionState.holdStrength = 0;
+        }
+
+        function handlePointerMove(event) {
+          interactionState.pointerX = event.clientX;
+          interactionState.pointerY = event.clientY;
+        }
+
+        function handlePointerUp(event) {
+          const now = performance.now();
+          const heldFor = now - interactionState.startTime;
+          const moveDistance =
+            Math.abs(event.clientX - interactionState.startX) +
+            Math.abs(event.clientY - interactionState.startY);
+          const interaction = resolveInteraction(event.clientX, event.clientY);
+
+          if (interaction && interactionState.holdStarted) {
+            emitInteraction("hold", interaction, 0.42 + interactionState.holdStrength * 0.48);
+          } else if (interaction && heldFor < 260 && moveDistance < 24) {
+            interactionState.tapBurst =
+              now - interactionState.lastTapTime < 540 ? interactionState.tapBurst + 1 : 1;
+            interactionState.lastTapTime = now;
+            emitInteraction(
+              "tap",
+              interaction,
+              0.28 + Math.min(0.22, interactionState.tapBurst * 0.06),
+            );
+          }
+
+          interactionState.down = false;
+          interactionState.holdStarted = false;
+          interactionState.holdStrength = 0;
+        }
+
+        let lastSample = 0;
+        const clock = new THREE.Clock();
+
+        function render() {
+          requestAnimationFrame(render);
+          const elapsed = clock.getElapsedTime();
+
+          sharedUniforms.time.value = elapsed;
+          smoothedMotion.x += (motionTarget.x - smoothedMotion.x) * 0.08;
+          smoothedMotion.y += (motionTarget.y - smoothedMotion.y) * 0.08;
+          sharedUniforms.motionX.value = smoothedMotion.x;
+          sharedUniforms.motionY.value = smoothedMotion.y;
+
+          const activeMotion = motionTarget.userActive > 0.5 ? 1.0 : 0.0;
+          const driftGate = 1.0 - activeMotion;
+          driftOffset.x += ((Math.sin(elapsed * 0.13) * 0.034) - driftOffset.x) * 0.018 * driftGate;
+          driftOffset.y += ((Math.cos(elapsed * 0.17) * 0.018) - driftOffset.y) * 0.018 * driftGate;
+
+          cameraOffset.x += (smoothedMotion.x * 0.42 - cameraOffset.x) * 0.08;
+          cameraOffset.y += (-smoothedMotion.y * 0.28 - cameraOffset.y) * 0.08;
+
+          camera.position.x = cameraOffset.x;
+          camera.position.y = cameraOffset.y + driftOffset.y * 0.16 * driftGate;
+          tempWorldVector.set(0, 0.01, 0);
+          anchorRig.localToWorld(tempWorldVector);
+          camera.lookAt(tempWorldVector);
+
+          if (materializeRequested) {
+            const progress = Math.min(1, (performance.now() - materializeStart) / 1450);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            sharedUniforms.reveal.value = eased;
+            portalGroup.scale.setScalar(0.92 + eased * 0.08);
+            auraMesh.scale.setScalar(0.78 + eased * 0.22);
+            presenceGroup.scale.setScalar(0.86 + eased * 0.14);
+            if (progress >= 1) {
+              materializeRequested = false;
+            }
+          }
+
+          if (elapsed - lastSample > 0.18) {
+            sampleVideoState();
+            lastSample = elapsed;
+          }
+
+          if (interactionState.down) {
+            const heldFor = performance.now() - interactionState.startTime;
+            if (heldFor > 240) {
+              interactionState.holdStarted = true;
+              interactionState.holdStrength = THREE.MathUtils.clamp(
+                (heldFor - 240) / 780,
+                0,
+                1,
+              );
+              interactionField.hold = Math.max(
+                interactionField.hold,
+                interactionState.holdStrength * 0.55,
+              );
+              const liveInteraction = resolveInteraction(
+                interactionState.pointerX,
+                interactionState.pointerY,
+              );
+              if (liveInteraction) {
+                interactionField.energy = Math.min(
+                  1,
+                  interactionField.energy + 0.018 + interactionState.holdStrength * 0.01,
+                );
+                interactionField[liveInteraction.side] = Math.min(
+                  1,
+                  interactionField[liveInteraction.side] + 0.012,
+                );
+              }
+            }
+          }
+
+          evolveAiScene(elapsed);
+          updateExpansionPanels();
+          updateRealityAnchor(elapsed);
+          updateDepthLayers();
+          updateEnvironment(elapsed);
+          updateAvatars(elapsed);
+          updatePresence(elapsed);
+          updateInteractionEffects();
+          emitAnchorState();
+
+          shadowMesh.material.opacity =
+            0.08 +
+            settings.immersionLevel * 0.12 +
+            frameState.motionEstimate * 0.06 +
+            Math.abs(frameState.centroidX) * 0.1;
+          shadowMesh.position.x = frameState.centroidX * 0.28 + smoothedMotion.x * 0.32;
+          shadowMesh.position.y = -1.1 - Math.abs(smoothedMotion.y) * 0.08;
+          shadowMesh.scale.x = 1.0 + settings.immersionLevel * 0.08 + frameState.flash * 0.08;
+
+          leftSpill.position.x = -1.26 - frameState.centroidX * 0.3;
+          rightSpill.position.x = 1.26 - frameState.centroidX * 0.3;
+          topSpill.position.y = 0.86 + frameState.centroidY * 0.14;
+          floorSpill.position.y = -0.88 + Math.abs(frameState.centroidY) * 0.08;
+
+          if (panner && audioContext) {
+            const distance = sceneConfig?.audio?.distance ?? 1.75;
+            const orbitRadius = sceneConfig?.audio?.orbitRadius ?? 0.35;
+            const elevation = sceneConfig?.audio?.elevation ?? 0.1;
+            const rotationSpeed = sceneConfig?.audio?.rotationSpeed ?? 0.2;
+            const orbit = Math.sin(elapsed * rotationSpeed) * orbitRadius * 0.3;
+            const audioX = THREE.MathUtils.clamp(
+              frameState.centroidX * 3.4 + smoothedMotion.x * 0.65 + orbit,
+              -0.72,
+              0.72
+            );
+            const audioY = THREE.MathUtils.clamp(
+              elevation - frameState.centroidY * 0.4,
+              -0.25,
+              0.4
+            );
+            const audioZ = -distance + frameState.motionEstimate * 0.12;
+            tempWorldVector.set(audioX, audioY, audioZ);
+            portalGroup.localToWorld(tempWorldVector);
+
+            panner.positionX.value = tempWorldVector.x;
+            panner.positionY.value = tempWorldVector.y;
+            panner.positionZ.value = tempWorldVector.z;
+
+            const wetTarget =
+              (settings.spatialAudioEnabled ? 1 : 0) *
+              (0.08 + settings.immersionLevel * 0.12 + frameState.flash * 0.12);
+            wetGain.gain.value += (wetTarget - wetGain.gain.value) * 0.08;
+            dryGain.gain.value +=
+              (((settings.spatialAudioEnabled ? 1 : 0) * 0.92) - dryGain.gain.value) * 0.08;
+
+            setListenerPosition(camera.position.x, camera.position.y, camera.position.z);
+          }
+
+          renderer.render(scene, camera);
+        }
+
+        renderer.domElement.addEventListener("pointerdown", handlePointerDown, {
+          passive: true,
+        });
+        renderer.domElement.addEventListener("pointermove", handlePointerMove, {
+          passive: true,
+        });
+        renderer.domElement.addEventListener("pointerup", handlePointerUp, {
+          passive: true,
+        });
+        renderer.domElement.addEventListener("pointercancel", () => {
+          interactionState.down = false;
+          interactionState.holdStarted = false;
+          interactionState.holdStrength = 0;
+        });
+
+        renderer.domElement.addEventListener("click", (event) => {
+          if (audioContext && audioContext.state === "suspended") {
+            audioContext.resume().catch(() => {});
+          }
+          video.play().catch(() => {});
+          beginMaterialization();
+          if (presenceSession && presenceSession.presenceEnabled) {
+            broadcastPeerData({ type: "reaction" });
+            sendSignal({
+              type: "presence-update",
+              roomId: presenceSession.roomId,
+              clientId: presenceSession.clientId,
+              reaction: "pulse",
+              orientation: [camera.rotation.x, camera.rotation.y, camera.rotation.z],
+              speakingLevel: getLocalSpeakingLevel(),
+            });
+          }
+          const interaction = resolveInteraction(event.clientX, event.clientY);
+          if (interaction) {
+            interactionField.energy = Math.min(1, interactionField.energy + 0.08);
+          }
+          const rect = renderer.domElement.getBoundingClientRect();
+          const edgeBand = Math.min(96, rect.height * 0.12);
+          if (event.clientY - rect.top < edgeBand || rect.bottom - event.clientY < edgeBand) {
+            bridge({ type: "tap" });
+          }
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.HollowCastPortal = {
+          configure,
+          applySettings,
+          updateMotion,
+          setPlayback,
+          setMuted,
+          beginMaterialization,
+        };
+
+        render();
+        bridge({ type: "ready" });
+      })();
+    </script>
+  </body>
+</html>

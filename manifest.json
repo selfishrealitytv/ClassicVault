@@ -1,0 +1,36 @@
+{
+    "name": "ClassicVault",
+    "short_name": "ClassicVault",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#07090D",
+    "theme_color": "#0B0B0B",
+    "description": "A curated classic cinema vault featuring horror, noir, Black cinema, comedy, and public-domain film.",
+    "orientation": "any",
+    "prefer_related_applications": false,
+    "categories": ["entertainment", "lifestyle", "video"],
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
