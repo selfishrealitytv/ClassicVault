@@ -288,6 +288,24 @@
       }, 500);
     })();
   </script>
+  <script>
+    // Disable stale Flutter web app shells on static hosting by clearing any
+    // previously registered service workers before bootstrapping the app.
+    (function () {
+      if (!('serviceWorker' in navigator)) {
+        return;
+      }
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          return Promise.all(registrations.map(function (registration) {
+            return registration.unregister();
+          }));
+        }).catch(function (error) {
+          console.warn('ClassicVault could not clear old service workers.', error);
+        });
+      });
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
