@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Browse the Texas Ego Films movie catalog by genre with a fast poster-first layout.">
+  <meta name="theme-color" content="#040714">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TexasEgoFilms Streaming">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Texas Ego Films | Browse Movies</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06070b;
+      --panel: rgba(14, 16, 23, 0.92);
+      --panel-strong: rgba(8, 10, 16, 0.98);
+      --accent: #7be7ff;
+      --accent-2: #7a8cff;
+      --text: #f5f7fb;
+      --muted: #a1acbc;
+      --border: rgba(255, 255, 255, 0.1);
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+      --glow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 20px 60px rgba(0, 0, 0, 0.42);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 16% -4%, rgba(255, 255, 255, 0.08), transparent 20%),
+        radial-gradient(circle at 84% 0%, rgba(123, 231, 255, 0.12), transparent 24%),
+        linear-gradient(180deg, #020203 0%, #07090f 34%, var(--bg) 100%);
+      color: var(--text);
+      font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: linear-gradient(180deg, black 0%, transparent 86%);
+      opacity: 0.28;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(100vw, 1600px);
+      margin: 0 auto;
+      padding: 20px 0 56px;
+    }
+
+    .topnav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 0 24px 0;
+      padding: 16px 6px 18px;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      backdrop-filter: blur(20px);
+      background: linear-gradient(180deg, rgba(3, 4, 8, 0.96), rgba(3, 4, 8, 0.76), rgba(3, 4, 8, 0));
+    }
+
+    .topnav-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .topnav-logo {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+
+    .topnav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .topnav-tools {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .topnav-link {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: rgba(245, 247, 251, 0.74);
+      text-decoration: none;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: color 120ms ease;
+    }
+
+    .topnav-link:hover,
+    .topnav-link.is-active {
+      color: #fff;
+    }
+
+    .topnav-search-shell {
+      width: 0;
+      min-width: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: width 180ms ease, opacity 160ms ease;
+    }
+
+    .topnav-search-shell.is-open {
+      width: min(320px, calc(100vw - 280px));
+      opacity: 1;
+    }
+
+    .icon-button {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+      flex: 0 0 auto;
+    }
+
+    .icon-button:hover,
+    .icon-button.is-active {
+      transform: translateY(-1px);
+      border-color: rgba(123, 231, 255, 0.3);
+      background: rgba(123, 231, 255, 0.12);
+    }
+
+    .icon-button svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .search {
+      width: 100%;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+    }
+
+    .search::placeholder {
+      color: rgba(245, 247, 251, 0.42);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      margin: 0 24px 26px;
+      padding: 38px 34px 30px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 26px;
+      background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.52) 42%, rgba(0, 0, 0, 0.24) 100%),
+        radial-gradient(circle at 78% 22%, rgba(123, 231, 255, 0.14), transparent 24%),
+        radial-gradient(circle at 24% 10%, rgba(122, 140, 255, 0.16), transparent 26%),
+        linear-gradient(120deg, rgba(9, 12, 20, 0.98), rgba(4, 7, 14, 0.98));
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.44);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero-media {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .hero-media video,
+    .hero-media img {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 118%;
+      height: 118%;
+      transform: translate(-50%, -50%);
+      border: 0;
+      object-fit: cover;
+      filter: saturate(1.08) contrast(1.05) brightness(0.72);
+      pointer-events: none;
+    }
+
+    .hero-media video {
+      display: block;
+      opacity: 0.9;
+    }
+
+    .hero-media img {
+      display: block;
+      opacity: 1;
+      transition: opacity 220ms ease;
+    }
+
+    .hero-media.is-video-ready img {
+      opacity: 0.22;
+    }
+
+    .hero-media.is-video-active img {
+      opacity: 0;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.62) 38%, rgba(0, 0, 0, 0.42) 58%, rgba(0, 0, 0, 0.68) 100%),
+        linear-gradient(180deg, rgba(3, 4, 7, 0.16), rgba(3, 4, 7, 0.8));
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .hero > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-kicker {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .hero-title {
+      margin: 0;
+      max-width: 10ch;
+      font-size: clamp(40px, 6vw, 76px);
+      line-height: 0.94;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-copy {
+      max-width: 62ch;
+      margin-top: 16px;
+      font-size: 15px;
+      line-height: 1.72;
+      color: rgba(245, 247, 251, 0.82);
+    }
+
+    .hero-meta {
+      margin-top: 14px;
+      color: rgba(245, 247, 251, 0.72);
+      font-size: 13px;
+      line-height: 1.5;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-actions {
+      margin-top: 22px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+
+    .button:hover,
+    .chip:hover,
+    .watch:hover,
+    .watchlist-toggle:hover {
+      transform: translateY(-1px);
+    }
+
+    .button-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-color: transparent;
+      color: #07111f;
+      box-shadow: 0 16px 30px rgba(0, 0, 0, 0.26);
+    }
+
+    .button-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+    }
+
+    .chips {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 0 24px 12px;
+    }
+
+    .chip {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .section {
+      margin-top: 26px;
+      margin-left: 24px;
+      margin-right: 24px;
+      padding: 22px 22px 24px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      background: var(--panel);
+      box-shadow: var(--glow);
+      content-visibility: auto;
+      contain-intrinsic-size: 920px;
+    }
+
+    .section[hidden] {
+      display: none;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: visible;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: var(--panel-strong);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(123, 231, 255, 0.16);
+      box-shadow: 0 26px 52px rgba(0, 0, 0, 0.42);
+    }
+
+    .poster {
+      position: relative;
+      aspect-ratio: 2 / 3;
+      background: #111926;
+      overflow: hidden;
+      border-radius: 16px;
+    }
+
+    .preview-layer {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 180ms ease;
+      pointer-events: none;
+      z-index: 2;
+      background: radial-gradient(circle at center, rgba(11, 16, 27, 0.16), rgba(11, 16, 27, 0.72));
+    }
+
+    .preview-video,
+    .preview-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      object-fit: cover;
+      background: #000;
+      display: block;
+    }
+
+    .preview-frame {
+      display: none;
+    }
+
+    .card.is-previewing .preview-layer {
+      opacity: 1;
+    }
+
+    .card.is-previewing .poster > img {
+      opacity: 0.16;
+    }
+
+    .poster::after {
+      content: '';
+      position: absolute;
+      inset: auto 0 0;
+      height: 44%;
+      background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.68) 100%);
+      pointer-events: none;
+    }
+
+    .poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: opacity 180ms ease, transform 220ms ease;
+    }
+
+    .poster-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(7, 11, 18, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .card-body {
+      position: relative;
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: -96px;
+      padding: 0 14px 14px;
+      min-height: 180px;
+      height: 180px;
+      overflow: hidden;
+      z-index: 3;
+    }
+
+    .card:hover .card-body,
+    .card:focus-within .card-body {
+      height: auto;
+      min-height: 236px;
+      overflow: visible;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.2;
+      min-height: 2.4em;
+      text-shadow: 0 4px 16px rgba(0, 0, 0, 0.75);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .details {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      margin-top: 0;
+      transition: max-height 180ms ease, opacity 180ms ease, margin 180ms ease;
+      pointer-events: none;
+    }
+
+    .card:hover .details,
+    .card:focus-within .details {
+      max-height: 8.8em;
+      opacity: 1;
+      margin-top: 4px;
+      pointer-events: auto;
+    }
+
+    .meta {
+      margin-top: 0;
+      color: rgba(237, 247, 255, 0.78);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.4;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+      min-height: 1.3em;
+    }
+
+    .description {
+      margin: 4px 0 0;
+      color: rgba(245, 247, 251, 0.84);
+      font-size: 12px;
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .actions {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      margin-top: auto;
+      padding-top: 12px;
+      transform: translateY(8px);
+      opacity: 0.92;
+      transition: transform 180ms ease, opacity 180ms ease;
+    }
+
+    .card:hover .actions,
+    .card:focus-within .actions {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .watch,
+    .watchlist-toggle {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      min-height: 42px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .watch {
+      flex: 1;
+      width: 100%;
+      padding: 0 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #07111f;
+    }
+
+    .watchlist-toggle {
+      width: 42px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .watchlist-toggle.is-saved {
+      background: rgba(123, 231, 255, 0.12);
+      color: var(--accent);
+      border-color: rgba(123, 231, 255, 0.28);
+    }
+
+    .empty {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .player-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(2, 6, 12, 0.88);
+      backdrop-filter: blur(12px);
+      z-index: 80;
+    }
+
+    .player-overlay.is-open {
+      display: flex;
+    }
+
+    .player-panel {
+      width: min(1100px, 100%);
+      border-radius: 26px;
+      overflow: hidden;
+      background: rgba(5, 10, 18, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 36px 90px rgba(0, 0, 0, 0.5);
+    }
+
+    .player-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 18px 0;
+    }
+
+    .player-title {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .player-meta {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .close-player {
+      appearance: none;
+      border: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      font: inherit;
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .player-stage {
+      padding: 18px;
+    }
+
+    .player-stage-shell {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .player-frame,
+    .player-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000;
+    }
+
+    .player-frame {
+      overflow: hidden;
+    }
+
+    .player-frame iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .player-stage-shell.is-youtube .player-frame iframe {
+      transform: scale(1.08);
+      transform-origin: center center;
+    }
+
+    .player-video {
+      display: none;
+    }
+
+    .player-mask {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .player-mask::before,
+    .player-mask::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      background: #000;
+    }
+
+    .player-mask::before {
+      top: 0;
+      height: 76px;
+    }
+
+    .player-mask::after {
+      bottom: 0;
+      height: 56px;
+    }
+
+    .player-slate {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease;
+    }
+
+    .player-slate.is-visible {
+      opacity: 1;
+    }
+
+    .player-slate-content {
+      max-width: 560px;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .player-slate-kicker {
+      color: #8fb5de;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    .player-slate-title {
+      margin: 16px 0 0;
+      color: #f3f7fd;
+      font-size: clamp(30px, 5vw, 54px);
+      line-height: 1.05;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .player-slate-copy {
+      margin: 16px 0 0;
+      color: #9fb0cc;
+      font-size: 15px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .player-slate.is-start .player-slate-content {
+      opacity: 0;
+    }
+
+    @media (max-width: 900px) {
+      .page {
+        width: min(100vw, 1600px);
+        padding-top: 14px;
+      }
+
+      .topnav {
+        position: static;
+        margin: 0 14px;
+        padding-left: 0;
+        padding-right: 0;
+        flex-wrap: wrap;
+      }
+
+      .topnav-tools {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
+      .topnav-search-shell.is-open {
+        width: min(100%, 420px);
+      }
+
+      .hero,
+      .section {
+        margin-left: 14px;
+        margin-right: 14px;
+        padding: 18px;
+      }
+
+      .chips {
+        margin-left: 14px;
+        margin-right: 14px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(154px, 1fr));
+        gap: 14px;
+      }
+
+      .description {
+        min-height: 0;
+      }
+
+      .hero-title {
+        max-width: none;
+      }
+
+      .details {
+        max-height: none;
+        opacity: 1;
+        margin-top: 4px;
+        pointer-events: auto;
+      }
+
+      .card-body {
+        margin-top: 0;
+        padding: 14px;
+        min-height: 0;
+        height: auto;
+        overflow: visible;
+      }
+
+      .actions {
+        transform: none;
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <nav class="topnav" aria-label="Primary">
+      <div class="topnav-brand">
+        <div class="topnav-logo">Texas Ego Films</div>
+        <div class="topnav-links">
+          <a class="topnav-link" href="/movies.html">Home</a>
+          <a class="topnav-link is-active" href="/browse-movies.html">Browse Movies</a>
+          <a class="topnav-link" href="/classic-vault.html">Classic Vault</a>
+        </div>
+      </div>
+      <div class="topnav-tools">
+        <button id="searchToggle" class="icon-button" type="button" aria-label="Search">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="M20 20l-3.5-3.5"></path>
+          </svg>
+        </button>
+        <div id="searchShell" class="topnav-search-shell">
+          <input id="search" class="search" type="search" placeholder="Search titles, genres, and descriptions">
+        </div>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="hero-media">
+        <video
+          id="heroVideo"
+          src="/__desktop/Lionsgate-trailers-mp4/Michael_2026_Official_Trailer_-_Jaafar_Jackson.mp4"
+          muted
+          loop
+          playsinline
+          webkit-playsinline="true"
+          autoplay
+          preload="auto"
+          disablepictureinpicture
+          aria-hidden="true">
+        </video>
+        <img id="heroPoster" src="" alt="" aria-hidden="true" decoding="async">
+      </div>
+      <p class="hero-kicker">Top Rated Drama</p>
+      <h1 id="heroTitle" class="hero-title">Browse Movies By Genre</h1>
+      <div id="heroMeta" class="hero-meta"></div>
+      <p id="heroCopy" class="hero-copy"></p>
+      <div class="hero-actions">
+        <button id="heroPlay" class="button button-primary" type="button">Watch Drama</button>
+        <a class="button button-primary" href="/movies.html">Back To Home</a>
+        <a class="button button-secondary" href="/classic-vault.html">Enter Classic Vault</a>
+      </div>
+    </section>
+
+    <div id="genreChips" class="chips" aria-label="Genre shortcuts"></div>
+    <main id="sections"></main>
+  </div>
+
+  <div id="playerOverlay" class="player-overlay" aria-hidden="true">
+    <div class="player-panel" role="dialog" aria-modal="true" aria-labelledby="playerTitle">
+      <div class="player-head">
+        <div>
+          <h2 id="playerTitle" class="player-title">Now Playing</h2>
+          <div id="playerMeta" class="player-meta"></div>
+        </div>
+        <button id="closePlayer" class="close-player" type="button" aria-label="Close player">×</button>
+      </div>
+      <div class="player-stage">
+        <div id="playerStageShell" class="player-stage-shell">
+          <div id="playerFrame" class="player-frame" aria-hidden="true"></div>
+          <video id="playerVideo" class="player-video" controls playsinline></video>
+          <div id="playerMask" class="player-mask" aria-hidden="true" hidden></div>
+          <div id="playerSlate" class="player-slate" aria-hidden="true" hidden>
+            <div class="player-slate-content">
+              <div class="player-slate-kicker">Texas Ego Films</div>
+              <h3 id="playerSlateTitle" class="player-slate-title">End of the Movie</h3>
+              <p id="playerSlateCopy" class="player-slate-copy">Thanks for watching</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="movies-catalog-data.js"></script>
+  <script>
+    const catalogData = window.texasEgoMoviesCatalog || {};
+    const excludedSources = new Set(['FilmRise Movies']);
+    const excludedTitles = new Set([
+      'The Opportunists',
+      'Robert the Bruce',
+      'Malicious',
+      'The Golem',
+      'Daybreakers',
+      'Treehouse',
+      'The Cabin',
+      'The Wrong House',
+      'Wrong House'
+    ]);
+    const watchlistStorageKey = 'texas-ego-watchlist';
+    const search = document.getElementById('search');
+    const searchToggle = document.getElementById('searchToggle');
+    const searchShell = document.getElementById('searchShell');
+    const sectionsRoot = document.getElementById('sections');
+    const genreChips = document.getElementById('genreChips');
+    const heroTitle = document.getElementById('heroTitle');
+    const heroMeta = document.getElementById('heroMeta');
+    const heroCopy = document.getElementById('heroCopy');
+    const heroPlay = document.getElementById('heroPlay');
+    const heroMedia = document.querySelector('.hero-media');
+    const heroVideo = document.getElementById('heroVideo');
+    const heroPoster = document.getElementById('heroPoster');
+    const playerOverlay = document.getElementById('playerOverlay');
+    const playerTitle = document.getElementById('playerTitle');
+    const playerMeta = document.getElementById('playerMeta');
+    const playerStageShell = document.getElementById('playerStageShell');
+    const playerFrame = document.getElementById('playerFrame');
+    const playerVideo = document.getElementById('playerVideo');
+    const playerMask = document.getElementById('playerMask');
+    const playerSlate = document.getElementById('playerSlate');
+    const playerSlateTitle = document.getElementById('playerSlateTitle');
+    const playerSlateCopy = document.getElementById('playerSlateCopy');
+    const closePlayer = document.getElementById('closePlayer');
+    const fallbackPosterSvg = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">' +
+        '<rect width="600" height="900" fill="#101725"/>' +
+        '<rect x="40" y="40" width="520" height="820" rx="24" fill="#162033" stroke="#2c3b56" stroke-width="4"/>' +
+        '<text x="300" y="430" fill="#e5edf9" font-family="Arial, sans-serif" font-size="42" text-anchor="middle">Texas Ego Films</text>' +
+        '<text x="300" y="490" fill="#9fb0cc" font-family="Arial, sans-serif" font-size="28" text-anchor="middle">Poster Unavailable</text>' +
+      '</svg>'
+    );
+    const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isTouchPrimaryExperience = window.matchMedia('(pointer: coarse), (max-width: 1024px)').matches;
+
+    const sectionDefs = [
+      { id: 'drama', title: 'Drama', items: catalogData.dramaTitles || [] },
+      { id: 'horror', title: 'Horror', items: catalogData.horrorTitles || [] },
+      { id: 'comedy', title: 'Comedy', items: catalogData.comedyTitles || [] },
+      { id: 'romance', title: 'Romance', items: catalogData.romanceTitles || [] },
+      { id: 'rom-com', title: 'Rom Com', items: catalogData.romComTitles || [] },
+      { id: 'musical', title: 'Musical', items: catalogData.musicalTitles || [] },
+      { id: 'black-cinema', title: 'Black Cinema', items: catalogData.blackCinemaTitles || [] },
+      { id: 'tv-shows', title: 'TV Shows', items: catalogData.tvShowTitles || [] },
+      { id: 'mystery-crime', title: 'Mystery & Crime', items: catalogData.mysteryCrimeTitles || [] },
+      { id: 'sci-fi', title: 'Sci-Fi', items: catalogData.sciFiTitles || [] },
+      { id: 'action', title: 'Action', items: catalogData.actionTitles || [] },
+      { id: 'westerns', title: 'Westerns', items: catalogData.westernTitles || [] },
+      { id: 'thriller', title: 'Thriller', items: catalogData.thrillerTitles || [] },
+      { id: 'psychological-thriller', title: 'Psychological Thriller', items: catalogData.psychThrillerTitles || [] },
+      { id: 'religious', title: 'Religious & Spiritual', items: catalogData.religiousTitles || [] },
+      { id: 'documentary', title: 'Documentary', items: catalogData.documentaryTitles || [] }
+    ];
+    const visibleSectionDefs = sectionDefs.filter((def) => !(isSafariBrowser && def.id === 'mystery-crime'));
+    const topRatedDramaTitleNames = [
+      'The Way Back',
+      'Shadowlands',
+      'Robert the Bruce',
+      'Above Suspicion',
+      'The Opportunists'
+    ];
+    let featuredDramaItem = null;
+    const heroBackgroundPoster = 'https://image.tmdb.org/t/p/w780/dLhIYRptZACtKbQ3Lyf9wbqZKFT.jpg';
+    let hasQueuedHeroInteractionStart = false;
+    let isSearchOpen = false;
+    let previewStartTimer = null;
+    let previewPendingCard = null;
+    let activePreviewCard = null;
+    const playerIntroDurationMs = 10000;
+    const playerOutroDurationMs = 10000;
+    let youtubeApiPromise = null;
+    let youtubePlayer = null;
+    let youtubePlayerReady = false;
+    let activePlayerSessionId = 0;
+    let activePlayerMode = '';
+    let activePlayerItem = null;
+    let playerStartTimer = null;
+    let playerCloseTimer = null;
+    let youtubePlaybackQueued = false;
+
+    function extractYoutubeId(rawUrl) {
+      if (typeof rawUrl !== 'string' || !rawUrl) return '';
+      try {
+        const parsed = new URL(rawUrl);
+        if (parsed.hostname.includes('youtu.be')) {
+          return parsed.pathname.replace(/^\/+/, '').trim();
+        }
+        if (parsed.hostname.includes('youtube.com')) {
+          return parsed.searchParams.get('v') || '';
+        }
+      } catch (error) {
+      }
+      return '';
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function normalizePosterUrl(rawUrl) {
+      if (!rawUrl) return fallbackPosterSvg;
+      return rawUrl;
+    }
+
+    function normalizeItem(item) {
+      if (!item || !item.title || excludedSources.has(item.source || '') || excludedTitles.has(item.title)) return null;
+      const embedId = item.embedId || extractYoutubeId(item.watchUrl || '');
+      return {
+        title: item.title,
+        year: item.year || '',
+        source: item.source || 'Texas Ego Films',
+        genre: item.genre || '',
+        poster: normalizePosterUrl(item.poster),
+        description: item.description || 'Streaming title.',
+        embedId: embedId,
+        watchUrl: item.watchUrl || '',
+        videoUrl: item.videoUrl || ''
+      };
+    }
+
+    function getFeaturedDramaItem() {
+      const dramaPool = (catalogData.dramaTitles || [])
+        .map(normalizeItem)
+        .filter(Boolean);
+      for (const title of topRatedDramaTitleNames) {
+        const match = dramaPool.find((item) => item.title === title);
+        if (match) return match;
+      }
+      return dramaPool[0] || null;
+    }
+
+    function matchesQuery(item, query) {
+      if (!query) return true;
+      return [
+        item.title,
+        item.genre,
+        item.description,
+        item.year
+      ].join(' ').toLowerCase().includes(query);
+    }
+
+    function getWatchlistTitles() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(watchlistStorageKey) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function isSavedToWatchlist(title) {
+      return getWatchlistTitles().includes(title);
+    }
+
+    function toggleWatchlist(title) {
+      const current = getWatchlistTitles();
+      const next = current.includes(title)
+        ? current.filter((item) => item !== title)
+        : current.concat(title);
+      localStorage.setItem(watchlistStorageKey, JSON.stringify(next));
+      render();
+    }
+
+    function buildCard(item) {
+      const meta = [item.year, item.genre].filter(Boolean).join(' • ');
+      const saved = isSavedToWatchlist(item.title);
+      return (
+        '<article class="card" data-preview-embed="' + escapeHtml(item.embedId) + '" data-preview-video="' + escapeHtml(item.videoUrl) + '">' +
+          '<div class="poster">' +
+            '<div class="preview-layer" aria-hidden="true">' +
+              '<video class="preview-video" muted loop playsinline preload="none"></video>' +
+              '<iframe class="preview-frame" title="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin"></iframe>' +
+            '</div>' +
+            '<span class="poster-badge">' + escapeHtml(item.genre || 'Feature') + '</span>' +
+            '<img src="' + escapeHtml(item.poster) + '" alt="' + escapeHtml(item.title) + ' poster" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'' + escapeHtml(fallbackPosterSvg) + '\'">' +
+          '</div>' +
+          '<div class="card-body">' +
+            '<h2 class="title">' + escapeHtml(item.title) + '</h2>' +
+            '<div class="details">' +
+              '<div class="meta">' + escapeHtml(meta) + '</div>' +
+              '<p class="description">' + escapeHtml(item.description) + '</p>' +
+            '</div>' +
+            '<div class="actions">' +
+              '<button class="watch" type="button" data-title="' + escapeHtml(item.title) + '" data-year="' + escapeHtml(item.year) + '" data-genre="' + escapeHtml(item.genre) + '" data-source="' + escapeHtml(item.source) + '" data-embed-id="' + escapeHtml(item.embedId) + '" data-video-url="' + escapeHtml(item.videoUrl) + '">Watch</button>' +
+              '<button class="watchlist-toggle' + (saved ? ' is-saved' : '') + '" type="button" data-watchlist-title="' + escapeHtml(item.title) + '" aria-label="' + (saved ? 'Remove from watchlist' : 'Save to watchlist') + '">' + (saved ? '✓' : '+') + '</button>' +
+            '</div>' +
+          '</div>' +
+        '</article>'
+      );
+    }
+
+    function buildEmbedUrl(videoId) {
+      const origin = window.location && window.location.origin ? '&origin=' + encodeURIComponent(window.location.origin) : '';
+      return 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&cc_load_policy=0' + origin;
+    }
+
+    function buildPreviewEmbedUrl(videoId) {
+      const origin = window.location && window.location.origin ? '&origin=' + encodeURIComponent(window.location.origin) : '';
+      return 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&loop=1&playlist=' + encodeURIComponent(videoId) + '&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&cc_load_policy=0' + origin;
+    }
+
+    function clearPlayerTimers() {
+      if (playerStartTimer) {
+        window.clearTimeout(playerStartTimer);
+        playerStartTimer = null;
+      }
+      if (playerCloseTimer) {
+        window.clearTimeout(playerCloseTimer);
+        playerCloseTimer = null;
+      }
+    }
+
+    function setPlayerMode(mode) {
+      activePlayerMode = mode;
+      if (playerStageShell) {
+        playerStageShell.classList.toggle('is-youtube', mode === 'youtube');
+        playerStageShell.classList.toggle('is-video', mode === 'video');
+      }
+      if (playerMask) {
+        playerMask.hidden = mode !== 'youtube';
+      }
+    }
+
+    function showPlayerSlate(mode, item) {
+      if (!playerSlate) return;
+      playerSlate.hidden = false;
+      playerSlate.classList.add('is-visible');
+      playerSlate.classList.toggle('is-start', mode === 'start');
+      playerSlate.classList.toggle('is-end', mode === 'end');
+      if (mode === 'end') {
+        playerSlateTitle.textContent = 'End of the Movie';
+        playerSlateCopy.textContent = item && item.title ? item.title : 'Texas Ego Films';
+      } else {
+        playerSlateTitle.textContent = '';
+        playerSlateCopy.textContent = '';
+      }
+    }
+
+    function hidePlayerSlate() {
+      if (!playerSlate) return;
+      playerSlate.classList.remove('is-visible', 'is-start', 'is-end');
+      playerSlate.hidden = true;
+    }
+
+    function stopYoutubePlayback() {
+      if (!youtubePlayer || typeof youtubePlayer.stopVideo !== 'function') return;
+      try {
+        youtubePlayer.stopVideo();
+      } catch (error) {
+      }
+    }
+
+    function resetVideoPlayback() {
+      playerVideo.pause();
+      playerVideo.removeAttribute('src');
+      playerVideo.load();
+    }
+
+    function schedulePlayerStart(sessionId, startPlayback) {
+      clearPlayerTimers();
+      showPlayerSlate('start');
+      playerStartTimer = window.setTimeout(() => {
+        if (sessionId !== activePlayerSessionId) return;
+        hidePlayerSlate();
+        startPlayback();
+      }, playerIntroDurationMs);
+    }
+
+    function schedulePlayerEndCard(sessionId) {
+      clearPlayerTimers();
+      showPlayerSlate('end', activePlayerItem);
+      playerCloseTimer = window.setTimeout(() => {
+        if (sessionId !== activePlayerSessionId) return;
+        closeMoviePlayer();
+      }, playerOutroDurationMs);
+    }
+
+    function maybeStartYoutubePlayback(sessionId) {
+      if (sessionId !== activePlayerSessionId || activePlayerMode !== 'youtube' || !youtubePlaybackQueued || !youtubePlayerReady || !youtubePlayer) {
+        return;
+      }
+      youtubePlaybackQueued = false;
+      hidePlayerSlate();
+      try {
+        youtubePlayer.playVideo();
+      } catch (error) {
+      }
+    }
+
+    function handleYoutubeStateChange(event) {
+      if (!window.YT || activePlayerMode !== 'youtube') return;
+      if (event.data === window.YT.PlayerState.ENDED) {
+        schedulePlayerEndCard(activePlayerSessionId);
+      }
+    }
+
+    function ensureYoutubeApi() {
+      if (window.YT && window.YT.Player) {
+        return Promise.resolve(window.YT);
+      }
+      if (youtubeApiPromise) {
+        return youtubeApiPromise;
+      }
+      youtubeApiPromise = new Promise((resolve, reject) => {
+        const previousReady = window.onYouTubeIframeAPIReady;
+        const script = document.createElement('script');
+        window.onYouTubeIframeAPIReady = () => {
+          if (typeof previousReady === 'function') {
+            previousReady();
+          }
+          resolve(window.YT);
+        };
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        script.onerror = () => reject(new Error('YouTube API failed to load.'));
+        document.head.appendChild(script);
+      });
+      return youtubeApiPromise;
+    }
+
+    function prepareYoutubePlayer(videoId, sessionId) {
+      setPlayerMode('youtube');
+      playerVideo.style.display = 'none';
+      playerFrame.style.display = 'block';
+      stopYoutubePlayback();
+      ensureYoutubeApi().then(() => {
+        if (sessionId !== activePlayerSessionId || activePlayerMode !== 'youtube') return;
+        if (!youtubePlayer) {
+          youtubePlayer = new window.YT.Player('playerFrame', {
+            width: '100%',
+            height: '100%',
+            videoId: videoId,
+            host: 'https://www.youtube-nocookie.com',
+            playerVars: {
+              autoplay: 0,
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
+              rel: 0,
+              modestbranding: 1,
+              iv_load_policy: 3,
+              playsinline: 1,
+              enablejsapi: 1,
+              cc_load_policy: 0,
+              origin: window.location.origin || undefined
+            },
+            events: {
+              onReady: () => {
+                youtubePlayerReady = true;
+                if (youtubePlayer && typeof youtubePlayer.cueVideoById === 'function') {
+                  youtubePlayer.cueVideoById(videoId);
+                }
+                maybeStartYoutubePlayback(sessionId);
+              },
+              onStateChange: handleYoutubeStateChange
+            }
+          });
+          return;
+        }
+        youtubePlayerReady = true;
+        if (typeof youtubePlayer.cueVideoById === 'function') {
+          youtubePlayer.cueVideoById(videoId);
+        }
+        maybeStartYoutubePlayback(sessionId);
+      }).catch(() => {
+        closeMoviePlayer();
+      });
+      schedulePlayerStart(sessionId, () => {
+        youtubePlaybackQueued = true;
+        maybeStartYoutubePlayback(sessionId);
+      });
+    }
+
+    function syncHeroBackgroundPlayback() {
+      if (!heroVideo) return;
+      heroVideo.muted = true;
+      heroVideo.defaultMuted = true;
+      heroVideo.setAttribute('muted', '');
+      heroVideo.setAttribute('playsinline', '');
+      heroVideo.playsInline = true;
+      const playAttempt = heroVideo.play();
+      if (playAttempt && typeof playAttempt.catch === 'function') {
+        playAttempt.catch(() => {
+          queueHeroInteractionStart();
+        });
+      }
+    }
+
+    function queueHeroInteractionStart() {
+      if (hasQueuedHeroInteractionStart || !heroVideo || isTouchPrimaryExperience) return;
+      hasQueuedHeroInteractionStart = true;
+      const resume = () => {
+        heroVideo.play().catch(() => {});
+        window.removeEventListener('pointerdown', resume, true);
+        window.removeEventListener('keydown', resume, true);
+        window.removeEventListener('touchstart', resume, true);
+      };
+      window.addEventListener('pointerdown', resume, true);
+      window.addEventListener('keydown', resume, true);
+      window.addEventListener('touchstart', resume, true);
+    }
+
+    function updateHeroBackground() {
+      heroPoster.src = heroBackgroundPoster;
+      if (heroMedia) {
+        heroMedia.classList.remove('is-video-active');
+      }
+      if (isTouchPrimaryExperience) {
+        return;
+      }
+      heroVideo.currentTime = 0;
+      heroVideo.load();
+      syncHeroBackgroundPlayback();
+    }
+
+    function openPlayer(item) {
+      activePlayerSessionId += 1;
+      const sessionId = activePlayerSessionId;
+      activePlayerItem = item;
+      playerTitle.textContent = item.title;
+      playerMeta.textContent = [item.year, item.genre].filter(Boolean).join(' • ');
+      playerOverlay.classList.add('is-open');
+      playerOverlay.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      if (item.videoUrl) {
+        setPlayerMode('video');
+        stopYoutubePlayback();
+        playerFrame.style.display = 'none';
+        playerVideo.style.display = 'block';
+        playerVideo.src = item.videoUrl;
+        playerVideo.load();
+        schedulePlayerStart(sessionId, () => {
+          playerVideo.play().catch(() => {});
+        });
+        return;
+      }
+      resetVideoPlayback();
+      prepareYoutubePlayer(item.embedId, sessionId);
+    }
+
+    function updateHeroFeature() {
+      featuredDramaItem = getFeaturedDramaItem();
+      if (!featuredDramaItem) {
+        heroTitle.textContent = 'Browse Movies By Genre';
+        heroMeta.textContent = '';
+        heroCopy.textContent = '';
+        heroPlay.hidden = true;
+        return;
+      }
+      heroTitle.textContent = featuredDramaItem.title;
+      heroMeta.textContent = [featuredDramaItem.year, 'Drama'].filter(Boolean).join(' • ');
+      heroCopy.textContent = featuredDramaItem.description;
+      heroPlay.hidden = false;
+      updateHeroBackground();
+    }
+
+    function syncSearchShell() {
+      const shouldOpen = isSearchOpen || Boolean(search.value.trim());
+      searchShell.classList.toggle('is-open', shouldOpen);
+      searchToggle.classList.toggle('is-active', shouldOpen);
+      searchToggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    }
+
+    function openSearch() {
+      isSearchOpen = true;
+      syncSearchShell();
+      window.requestAnimationFrame(() => {
+        search.focus();
+        search.select();
+      });
+    }
+
+    function closeSearch() {
+      isSearchOpen = false;
+      syncSearchShell();
+    }
+
+    function clearPendingPreview() {
+      if (previewStartTimer) {
+        window.clearTimeout(previewStartTimer);
+        previewStartTimer = null;
+      }
+      previewPendingCard = null;
+    }
+
+    function stopCardPreview(card) {
+      const target = card || activePreviewCard;
+      if (!target) return;
+      const previewVideo = target.querySelector('.preview-video');
+      const previewFrame = target.querySelector('.preview-frame');
+      target.classList.remove('is-previewing');
+      if (previewVideo) {
+        previewVideo.pause();
+        previewVideo.removeAttribute('src');
+        previewVideo.load();
+      }
+      if (previewFrame) {
+        previewFrame.src = '';
+        previewFrame.style.display = 'none';
+      }
+      if (activePreviewCard === target) {
+        activePreviewCard = null;
+      }
+    }
+
+    function startCardPreview(card) {
+      if (!card || isTouchPrimaryExperience) return;
+      if (activePreviewCard === card) return;
+      stopCardPreview();
+      const previewVideo = card.querySelector('.preview-video');
+      const previewFrame = card.querySelector('.preview-frame');
+      const videoUrl = card.dataset.previewVideo || '';
+      const embedId = card.dataset.previewEmbed || '';
+      if (!videoUrl && !embedId) return;
+      card.classList.add('is-previewing');
+      activePreviewCard = card;
+      if (videoUrl && previewVideo) {
+        previewVideo.src = videoUrl;
+        previewVideo.currentTime = 0;
+        previewVideo.play().catch(() => {
+          card.classList.remove('is-previewing');
+        });
+        return;
+      }
+      if (embedId && previewFrame) {
+        previewFrame.style.display = 'block';
+        previewFrame.src = buildPreviewEmbedUrl(embedId);
+        return;
+      }
+      card.classList.remove('is-previewing');
+      activePreviewCard = null;
+    }
+
+    function queueCardPreview(card) {
+      if (!card || isTouchPrimaryExperience) return;
+      if (activePreviewCard === card || previewPendingCard === card) return;
+      clearPendingPreview();
+      previewPendingCard = card;
+      previewStartTimer = window.setTimeout(() => {
+        startCardPreview(card);
+        previewStartTimer = null;
+        previewPendingCard = null;
+      }, 220);
+    }
+
+    function closeMoviePlayer() {
+      activePlayerSessionId += 1;
+      activePlayerItem = null;
+      youtubePlaybackQueued = false;
+      clearPlayerTimers();
+      hidePlayerSlate();
+      setPlayerMode('');
+      playerOverlay.classList.remove('is-open');
+      playerOverlay.setAttribute('aria-hidden', 'true');
+      stopYoutubePlayback();
+      resetVideoPlayback();
+      playerVideo.style.display = 'none';
+      playerFrame.style.display = 'block';
+      document.body.style.overflow = '';
+    }
+
+    function createSection(def) {
+      const section = document.createElement('section');
+      section.className = 'section';
+      section.id = 'section-' + def.id;
+      section.innerHTML =
+        '<div class="section-head">' +
+          '<div>' +
+            '<h2 class="section-title">' + escapeHtml(def.title) + '</h2>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid"></div>' +
+        '<div class="empty" hidden>No titles match that search right now.</div>';
+      return section;
+    }
+
+    function render() {
+      const query = search.value.trim().toLowerCase();
+      let visibleSections = 0;
+      visibleSectionDefs.forEach((def) => {
+        const items = def.items
+          .map(normalizeItem)
+          .filter(Boolean)
+          .filter((item) => matchesQuery(item, query));
+        const section = document.getElementById('section-' + def.id);
+        const grid = section.querySelector('.grid');
+        const empty = section.querySelector('.empty');
+        if (!items.length) {
+          section.hidden = true;
+          grid.innerHTML = '';
+          empty.hidden = false;
+          return;
+        }
+        visibleSections += 1;
+        section.hidden = false;
+        grid.innerHTML = items.map(buildCard).join('');
+        empty.hidden = true;
+      });
+      if (!visibleSections) {
+        sectionsRoot.dataset.empty = '1';
+      } else {
+        delete sectionsRoot.dataset.empty;
+      }
+    }
+
+    visibleSectionDefs.forEach((def) => {
+      sectionsRoot.appendChild(createSection(def));
+      const chip = document.createElement('button');
+      chip.className = 'chip';
+      chip.type = 'button';
+      chip.textContent = def.title;
+      chip.addEventListener('click', () => {
+        const section = document.getElementById('section-' + def.id);
+        if (section && !section.hidden) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+      genreChips.appendChild(chip);
+    });
+
+    document.body.addEventListener('click', (event) => {
+      if (searchToggle && event.target.closest('#searchToggle')) {
+        if (searchShell.classList.contains('is-open') && document.activeElement === search) {
+          closeSearch();
+        } else {
+          openSearch();
+        }
+        return;
+      }
+
+      if (searchShell && !event.target.closest('#searchShell')) {
+        if (!event.target.closest('#searchToggle') && !search.value.trim()) {
+          closeSearch();
+        }
+      }
+
+      const watchlistTrigger = event.target.closest('.watchlist-toggle');
+      if (watchlistTrigger) {
+        toggleWatchlist(watchlistTrigger.dataset.watchlistTitle);
+        return;
+      }
+      const watchTrigger = event.target.closest('.watch');
+      if (!watchTrigger) return;
+      const item = {
+        title: watchTrigger.dataset.title,
+        year: watchTrigger.dataset.year,
+        genre: watchTrigger.dataset.genre,
+        source: watchTrigger.dataset.source,
+        embedId: watchTrigger.dataset.embedId,
+        videoUrl: watchTrigger.dataset.videoUrl
+      };
+      if (!item.embedId && !item.videoUrl) return;
+      openPlayer(item);
+    });
+
+    sectionsRoot.addEventListener('mouseover', (event) => {
+      const card = event.target.closest('.card');
+      if (!card || !sectionsRoot.contains(card)) return;
+      if (event.relatedTarget && card.contains(event.relatedTarget)) return;
+      queueCardPreview(card);
+    });
+
+    sectionsRoot.addEventListener('mouseout', (event) => {
+      const card = event.target.closest('.card');
+      if (!card || !sectionsRoot.contains(card)) return;
+      if (event.relatedTarget && card.contains(event.relatedTarget)) return;
+      if (previewPendingCard === card) {
+        clearPendingPreview();
+      }
+      if (activePreviewCard === card) {
+        stopCardPreview(card);
+      }
+    });
+
+    sectionsRoot.addEventListener('focusin', (event) => {
+      const card = event.target.closest('.card');
+      if (!card || !sectionsRoot.contains(card)) return;
+      queueCardPreview(card);
+    });
+
+    sectionsRoot.addEventListener('focusout', (event) => {
+      const card = event.target.closest('.card');
+      if (!card || !sectionsRoot.contains(card)) return;
+      if (event.relatedTarget && card.contains(event.relatedTarget)) return;
+      if (previewPendingCard === card) {
+        clearPendingPreview();
+      }
+      if (activePreviewCard === card) {
+        stopCardPreview(card);
+      }
+    });
+
+    closePlayer.addEventListener('click', closeMoviePlayer);
+    playerVideo.addEventListener('ended', () => {
+      if (activePlayerMode !== 'video') return;
+      schedulePlayerEndCard(activePlayerSessionId);
+    });
+    heroPlay.addEventListener('click', () => {
+      if (!featuredDramaItem) return;
+      openPlayer(featuredDramaItem);
+    });
+    playerOverlay.addEventListener('click', (event) => {
+      if (event.target === playerOverlay) {
+        closeMoviePlayer();
+      }
+    });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && playerOverlay.classList.contains('is-open')) {
+        closeMoviePlayer();
+        return;
+      }
+      if (event.key === 'Escape' && searchShell.classList.contains('is-open') && !search.value.trim()) {
+        closeSearch();
+        searchToggle.focus();
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (heroVideo) {
+          heroVideo.pause();
+        }
+        return;
+      }
+      if (featuredDramaItem && !isTouchPrimaryExperience) {
+        syncHeroBackgroundPlayback();
+      }
+    });
+    if (heroVideo) {
+      heroVideo.addEventListener('canplay', syncHeroBackgroundPlayback);
+      heroVideo.addEventListener('loadedmetadata', () => {
+        if (heroMedia) {
+          heroMedia.classList.add('is-video-ready');
+        }
+        syncHeroBackgroundPlayback();
+      });
+      heroVideo.addEventListener('loadeddata', () => {
+        if (heroMedia) {
+          heroMedia.classList.add('is-video-ready');
+        }
+        syncHeroBackgroundPlayback();
+      });
+      heroVideo.addEventListener('playing', () => {
+        if (heroMedia) {
+          heroMedia.classList.add('is-video-ready');
+          heroMedia.classList.add('is-video-active');
+        }
+      });
+      heroVideo.addEventListener('pause', () => {
+        if (heroMedia) {
+          heroMedia.classList.remove('is-video-active');
+        }
+      });
+      heroVideo.addEventListener('ended', () => {
+        if (heroMedia) {
+          heroMedia.classList.add('is-video-active');
+        }
+      });
+      heroVideo.addEventListener('error', () => {
+        if (heroMedia) {
+          heroMedia.classList.remove('is-video-ready');
+          heroMedia.classList.remove('is-video-active');
+        }
+      });
+    }
+    search.addEventListener('input', render);
+    search.addEventListener('blur', () => {
+      if (!search.value.trim()) {
+        window.setTimeout(() => {
+          if (document.activeElement !== searchToggle) {
+            closeSearch();
+          }
+        }, 80);
+      }
+    });
+
+    updateHeroFeature();
+    syncSearchShell();
+    render();
+  </script>
+</body>
+</html>
