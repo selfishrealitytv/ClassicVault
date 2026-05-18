@@ -217,6 +217,86 @@
   </div>
   <script>
     (function () {
+      window.classicVaultMediaNetConfig = window.classicVaultMediaNetConfig || {
+        enabled: false,
+        cid: '',
+        versionId: '3121199',
+        slots: {
+          'home-break-classic-tv': {
+            crid: '',
+            size: 'responsive',
+          },
+          'home-break-continue-watching': {
+            crid: '',
+            size: 'responsive',
+          },
+          'catalog-inline-contextual': {
+            crid: '',
+            size: 'responsive',
+          }
+        }
+      };
+
+      function renderMediaNetPlaceholder(root, title, description) {
+        root.innerHTML = '';
+        root.className = 'cv-media-net-slot';
+        root.innerHTML =
+          '<div class="cv-media-net-card">' +
+            '<div class="cv-media-net-label">Sponsored</div>' +
+            '<div class="cv-media-net-title">' + title + '</div>' +
+            '<div class="cv-media-net-copy">' + description + '</div>' +
+            '<div class="cv-media-net-meta">Media.net slot ready. Add your cid and crid in web/index.html to go live.</div>' +
+          '</div>';
+      }
+
+      function ensureMediaNetScript(config) {
+        if (!config.enabled || !config.cid || document.getElementById('cv-media-net-script')) {
+          return;
+        }
+        window._mNHandle = window._mNHandle || {};
+        window._mNHandle.queue = window._mNHandle.queue || [];
+        window.medianet_versionId = config.versionId || '3121199';
+
+        var script = document.createElement('script');
+        script.id = 'cv-media-net-script';
+        script.async = true;
+        script.src = 'https://contextual.media.net/dmedianet.js?cid=' + encodeURIComponent(config.cid);
+        document.head.appendChild(script);
+      }
+
+      window.classicVaultMediaNetMount = function (elementId, slotKey, title, description) {
+        var root = document.getElementById(elementId);
+        if (!root) {
+          return;
+        }
+        var config = window.classicVaultMediaNetConfig || {};
+        var slot = (config.slots && config.slots[slotKey]) || {};
+
+        renderMediaNetPlaceholder(root, title, description);
+
+        if (!config.enabled || !config.cid || !slot.crid) {
+          return;
+        }
+
+        ensureMediaNetScript(config);
+
+        var unitId = 'cv-media-net-unit-' + slotKey.replace(/[^a-z0-9]+/gi, '-');
+        var unit = document.createElement('div');
+        unit.id = unitId;
+        unit.className = 'cv-media-net-unit';
+        root.innerHTML = '';
+        root.className = 'cv-media-net-slot';
+        root.appendChild(unit);
+
+        try {
+          window._mNHandle.queue.push(function () {
+            window._mNDetails.loadTag(unitId, slot.size || 'responsive', slot.crid);
+          });
+        } catch (error) {
+          renderMediaNetPlaceholder(root, title, description);
+        }
+      };
+
       const message = document.getElementById('boot-message');
       const status = document.getElementById('boot-status');
       const actions = document.getElementById('boot-actions');
@@ -288,9 +368,113 @@
       }, 500);
     })();
   </script>
+  <style>
+    .cv-media-net-slot {
+      width: 100%;
+      height: 190px;
+      display: block;
+    }
+
+    .cv-media-net-card {
+      height: 100%;
+      border-radius: 20px;
+      border: 1px solid rgba(212, 175, 55, 0.22);
+      background:
+        radial-gradient(circle at top right, rgba(212, 175, 55, 0.10), transparent 28%),
+        linear-gradient(135deg, rgba(23, 18, 10, 0.98), rgba(13, 20, 28, 0.98));
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+      padding: 18px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      color: #eff6fb;
+      font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+    }
+
+    .cv-media-net-label {
+      align-self: flex-start;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      background: rgba(212, 175, 55, 0.08);
+      color: #efd891;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .cv-media-net-title {
+      margin-top: 14px;
+      color: #fff8e7;
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.05;
+    }
+
+    .cv-media-net-copy {
+      margin-top: 10px;
+      color: #b8c6d1;
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 64ch;
+    }
+
+    .cv-media-net-meta {
+      margin-top: auto;
+      color: #9fb3c4;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .cv-media-net-unit {
+      min-height: 100%;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+  </style>
   <script>
-    // Disable stale Flutter web app shells on static hosting by clearing any
-    // previously registered service workers before bootstrapping the app.
+    (function () {
+      var screenOrientation = screen.orientation;
+      if (!screenOrientation || typeof screenOrientation.lock !== 'function') {
+        return;
+      }
+
+      var phoneQuery = window.matchMedia('(max-width: 700px)');
+
+      function isPhoneLike() {
+        return phoneQuery.matches;
+      }
+
+      async function syncOrientationLock() {
+        if (!isPhoneLike()) {
+          return;
+        }
+
+        var fullscreenElement =
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.msFullscreenElement;
+
+        try {
+          if (fullscreenElement) {
+            await screenOrientation.lock('landscape');
+          } else if (typeof screenOrientation.unlock === 'function') {
+            screenOrientation.unlock();
+          }
+        } catch (_) {
+          // Some mobile browsers reject orientation changes unless the request
+          // comes from an approved fullscreen playback flow.
+        }
+      }
+
+      document.addEventListener('fullscreenchange', syncOrientationLock);
+      document.addEventListener('webkitfullscreenchange', syncOrientationLock);
+      window.addEventListener('orientationchange', syncOrientationLock);
+    })();
+  </script>
+  <script>
     (function () {
       if (!('serviceWorker' in navigator)) {
         return;
@@ -300,8 +484,8 @@
           return Promise.all(registrations.map(function (registration) {
             return registration.unregister();
           }));
-        }).catch(function (error) {
-          console.warn('ClassicVault could not clear old service workers.', error);
+        }).catch(function () {
+          // Ignore service worker cleanup failures during local/static debugging.
         });
       });
     })();
